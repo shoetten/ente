@@ -5,10 +5,13 @@ import {
 } from "@/new/photos/components/Gallery/BarImpl";
 import { PeopleHeader } from "@/new/photos/components/Gallery/PeopleHeader";
 import {
+    areOnlySystemCollections,
     collectionsSortBy,
+    isSystemCollection,
+    shouldShowOnCollectionBar,
     type CollectionsSortBy,
     type CollectionSummaries,
-} from "@/new/photos/types/collection";
+} from "@/new/photos/services/collection/ui";
 import { includes } from "@/utils/type-guards";
 import {
     getData,
@@ -29,12 +32,7 @@ import React, {
 } from "react";
 import { sortCollectionSummaries } from "services/collectionService";
 import { SetFilesDownloadProgressAttributesCreator } from "types/gallery";
-import {
-    ALL_SECTION,
-    hasNonSystemCollections,
-    isSystemCollection,
-    shouldBeShownOnCollectionBar,
-} from "utils/collection";
+import { ALL_SECTION } from "utils/collection";
 import {
     FilesDownloadProgressAttributes,
     isFilesDownloadCancelled,
@@ -124,7 +122,7 @@ export const GalleryBarAndListHeader: React.FC<CollectionsProps> = ({
     const shouldBeHidden = useMemo(
         () =>
             shouldHide ||
-            (!hasNonSystemCollections(toShowCollectionSummaries) &&
+            (areOnlySystemCollections(toShowCollectionSummaries) &&
                 activeCollectionID === ALL_SECTION),
         [shouldHide, toShowCollectionSummaries, activeCollectionID],
     );
@@ -212,7 +210,7 @@ export const GalleryBarAndListHeader: React.FC<CollectionsProps> = ({
                 onChangeCollectionsSortBy={setCollectionsSortBy}
                 onShowAllCollections={() => setOpenAllCollectionDialog(true)}
                 collectionSummaries={sortedCollectionSummaries.filter((x) =>
-                    shouldBeShownOnCollectionBar(x.type),
+                    shouldShowOnCollectionBar(x.type),
                 )}
             />
 
