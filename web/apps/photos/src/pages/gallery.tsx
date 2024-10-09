@@ -1,5 +1,6 @@
 import { stashRedirect } from "@/accounts/services/redirect";
 import { NavbarBase } from "@/base/components/Navbar";
+import { ActivityIndicator } from "@/base/components/mui/ActivityIndicator";
 import { useIsMobileWidth } from "@/base/hooks";
 import log from "@/base/log";
 import type { Collection } from "@/media/collection";
@@ -42,7 +43,6 @@ import {
     FlexWrapper,
     HorizontalFlex,
 } from "@ente/shared/components/Container";
-import EnteSpinner from "@ente/shared/components/EnteSpinner";
 import { PHOTOS_PAGES as PAGES } from "@ente/shared/constants/pages";
 import { getRecoveryKey } from "@ente/shared/crypto/helpers";
 import { CustomError } from "@ente/shared/error";
@@ -992,6 +992,7 @@ export default function Gallery() {
                     setTempHiddenFileIds,
                     setFixCreationTimeAttributes,
                     setFilesDownloadProgressAttributesCreator,
+                    updateFavItemIds,
                 );
             }
             clearSelection();
@@ -1029,7 +1030,7 @@ export default function Gallery() {
         };
         return () =>
             setCollectionNamerAttributes({
-                title: t("CREATE_COLLECTION"),
+                title: t("new_album"),
                 buttonText: t("CREATE"),
                 autoFilledName: "",
                 callback,
@@ -1119,6 +1120,11 @@ export default function Gallery() {
         [],
     );
 
+    const updateFavItemIds = async () => {
+        const favItemIds = await getFavItemIds(files);
+        setFavItemIds(favItemIds);
+    };
+
     if (!collectionSummaries || !filteredData) {
         return <div></div>;
     }
@@ -1159,7 +1165,7 @@ export default function Gallery() {
                 />
                 {blockingLoad && (
                     <LoadingOverlay>
-                        <EnteSpinner />
+                        <ActivityIndicator />
                     </LoadingOverlay>
                 )}
                 {isFirstLoad && (
