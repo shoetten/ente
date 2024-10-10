@@ -9,16 +9,16 @@ import {
     type CollectionSelectorAttributes,
 } from "@/new/photos/components/CollectionSelector";
 import {
-    PeopleEmptyState,
-    SearchResultsHeader,
-} from "@/new/photos/components/Gallery";
-import type { GalleryBarMode } from "@/new/photos/components/Gallery/BarImpl";
-import { GalleryPeopleState } from "@/new/photos/components/Gallery/PeopleHeader";
-import {
     SearchBar,
     type SearchBarProps,
 } from "@/new/photos/components/SearchBar";
 import { WhatsNew } from "@/new/photos/components/WhatsNew";
+import {
+    PeopleEmptyState,
+    SearchResultsHeader,
+} from "@/new/photos/components/gallery";
+import type { GalleryBarMode } from "@/new/photos/components/gallery/BarImpl";
+import { GalleryPeopleState } from "@/new/photos/components/gallery/PeopleHeader";
 import { shouldShowWhatsNew } from "@/new/photos/services/changelog";
 import type { CollectionSummaries } from "@/new/photos/services/collection/ui";
 import { areOnlySystemCollections } from "@/new/photos/services/collection/ui";
@@ -35,6 +35,7 @@ import {
     setSearchCollectionsAndFiles,
 } from "@/new/photos/services/search";
 import type { SearchOption } from "@/new/photos/services/search/types";
+import { AppContext } from "@/new/photos/types/context";
 import { EnteFile } from "@/new/photos/types/file";
 import { mergeMetadata } from "@/new/photos/utils/file";
 import { ensure } from "@/utils/ensure";
@@ -93,7 +94,6 @@ import PlanSelector from "components/pages/gallery/PlanSelector";
 import SelectedFileOptions from "components/pages/gallery/SelectedFileOptions";
 import { t } from "i18next";
 import { useRouter } from "next/router";
-import { AppContext } from "pages/_app";
 import {
     createContext,
     useCallback,
@@ -992,7 +992,7 @@ export default function Gallery() {
                     setTempHiddenFileIds,
                     setFixCreationTimeAttributes,
                     setFilesDownloadProgressAttributesCreator,
-                    updateFavItemIds,
+                    refreshFavItemIds,
                 );
             }
             clearSelection();
@@ -1120,7 +1120,7 @@ export default function Gallery() {
         [],
     );
 
-    const updateFavItemIds = async () => {
+    const refreshFavItemIds = async () => {
         const favItemIds = await getFavItemIds(files);
         setFavItemIds(favItemIds);
     };

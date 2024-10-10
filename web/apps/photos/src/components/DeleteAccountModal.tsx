@@ -1,12 +1,12 @@
+import { DialogBoxV2 } from "@/base/components/MiniDialog";
 import { FocusVisibleButton } from "@/base/components/mui/FocusVisibleButton";
 import { LoadingButton } from "@/base/components/mui/LoadingButton";
 import log from "@/base/log";
+import { AppContext } from "@/new/photos/types/context";
 import { initiateEmail } from "@/new/photos/utils/web";
-import DialogBoxV2 from "@ente/shared/components/DialogBoxV2";
 import { Link, Stack, useMediaQuery } from "@mui/material";
 import { Formik, type FormikHelpers } from "formik";
 import { t } from "i18next";
-import { AppContext } from "pages/_app";
 import { GalleryContext } from "pages/gallery";
 import { useContext, useRef, useState } from "react";
 import { Trans } from "react-i18next";
@@ -88,7 +88,7 @@ const DeleteAccountModal = ({ open, onClose }: Iprops) => {
             title: t("delete_account"),
             content: <Trans i18nKey="delete_account_confirm_message" />,
             proceed: {
-                text: t("DELETE"),
+                text: t("delete"),
                 action: solveChallengeAndDeleteAccount,
                 variant: "critical",
             },
@@ -109,7 +109,7 @@ const DeleteAccountModal = ({ open, onClose }: Iprops) => {
                 />
             ),
             proceed: {
-                text: t("DELETE"),
+                text: t("delete"),
                 action: () => initiateEmail(emailID),
                 variant: "critical",
             },

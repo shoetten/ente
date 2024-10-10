@@ -2,9 +2,8 @@ import type { Collection } from "@/media/collection";
 import {
     GalleryBarImpl,
     type GalleryBarImplProps,
-} from "@/new/photos/components/Gallery/BarImpl";
-import { PeopleHeader } from "@/new/photos/components/Gallery/PeopleHeader";
-import { SingleInputDialogTest } from "@/new/photos/components/SingleInputFormV2";
+} from "@/new/photos/components/gallery/BarImpl";
+import { PeopleHeader } from "@/new/photos/components/gallery/PeopleHeader";
 import {
     areOnlySystemCollections,
     collectionsSortBy,
@@ -23,14 +22,7 @@ import AllCollections from "components/Collections/AllCollections";
 import { SetCollectionNamerAttributes } from "components/Collections/CollectionNamer";
 import CollectionShare from "components/Collections/CollectionShare";
 import { ITEM_TYPE, TimeStampListItem } from "components/PhotoList";
-import { AppContext } from "pages/_app";
-import React, {
-    useCallback,
-    useContext,
-    useEffect,
-    useMemo,
-    useState,
-} from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { sortCollectionSummaries } from "services/collectionService";
 import { SetFilesDownloadProgressAttributesCreator } from "types/gallery";
 import { ALL_SECTION } from "utils/collection";
@@ -101,14 +93,11 @@ export const GalleryBarAndListHeader: React.FC<CollectionsProps> = ({
     filesDownloadProgressAttributesList,
     setFilesDownloadProgressAttributesCreator,
 }) => {
-    const appContext = useContext(AppContext);
-
     const [openAllCollectionDialog, setOpenAllCollectionDialog] =
         useState(false);
     const [openCollectionShareView, setOpenCollectionShareView] =
         useState(false);
     const [openAlbumCastDialog, setOpenAlbumCastDialog] = useState(false);
-    const [openPeopleSelector, setOpenPeopleSelector] = useState(false);
 
     const [collectionsSortBy, setCollectionsSortBy] =
         useCollectionsSortByLocalState("updation-time-desc");
@@ -174,7 +163,7 @@ export const GalleryBarAndListHeader: React.FC<CollectionsProps> = ({
                 ) : activePerson ? (
                     <PeopleHeader
                         person={activePerson}
-                        {...{ onSelectPerson, people, appContext }}
+                        {...{ onSelectPerson, people }}
                     />
                 ) : (
                     <></>
@@ -193,13 +182,6 @@ export const GalleryBarAndListHeader: React.FC<CollectionsProps> = ({
         // This causes a loop since it is an array dep
         // people,
     ]);
-
-    // TODO-Cluster
-    useEffect(() => {
-        if (process.env.NEXT_PUBLIC_ENTE_WIP_CL) {
-            setOpenPeopleSelector(true);
-        }
-    }, []);
 
     if (shouldBeHidden) {
         return <></>;
@@ -249,10 +231,6 @@ export const GalleryBarAndListHeader: React.FC<CollectionsProps> = ({
                 open={openAlbumCastDialog}
                 onClose={() => setOpenAlbumCastDialog(false)}
                 collection={activeCollection}
-            />
-            <SingleInputDialogTest
-                open={openPeopleSelector}
-                onClose={() => setOpenPeopleSelector(false)}
             />
         </>
     );

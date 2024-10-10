@@ -8,10 +8,11 @@ import type { Collection } from "@/media/collection";
 import {
     GalleryItemsHeaderAdapter,
     GalleryItemsSummary,
-} from "@/new/photos/components/Gallery/ListHeader";
+} from "@/new/photos/components/gallery/ListHeader";
 import { SpaceBetweenFlex } from "@/new/photos/components/mui";
 import downloadManager from "@/new/photos/services/download";
 import { sortFiles } from "@/new/photos/services/files";
+import { AppContext } from "@/new/photos/types/context";
 import { EnteFile } from "@/new/photos/types/file";
 import { mergeMetadata } from "@/new/photos/utils/file";
 import {
@@ -50,7 +51,6 @@ import Uploader from "components/Upload/Uploader";
 import { UploadSelectorInputs } from "components/UploadSelectorInputs";
 import { t } from "i18next";
 import { useRouter } from "next/router";
-import { AppContext } from "pages/_app";
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import {

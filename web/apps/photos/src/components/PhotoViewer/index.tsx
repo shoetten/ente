@@ -20,6 +20,7 @@ import { FileType } from "@/media/file-type";
 import { isHEICExtension, needsJPEGConversion } from "@/media/formats";
 import downloadManager from "@/new/photos/services/download";
 import { extractRawExif, parseExif } from "@/new/photos/services/exif";
+import { AppContext } from "@/new/photos/types/context";
 import type { LoadedLivePhotoSourceURL } from "@/new/photos/types/file";
 import { fileLogID } from "@/new/photos/utils/file";
 import { FlexWrapper } from "@ente/shared/components/Container";
@@ -41,7 +42,6 @@ import ZoomInOutlinedIcon from "@mui/icons-material/ZoomInOutlined";
 import { Box, Button, styled } from "@mui/material";
 import { t } from "i18next";
 import isElectron from "is-electron";
-import { AppContext } from "pages/_app";
 import { GalleryContext } from "pages/gallery";
 import { trashFiles } from "services/fileService";
 import { SetFilesDownloadProgressAttributesCreator } from "types/gallery";
@@ -849,7 +849,7 @@ function PhotoViewer(props: PhotoViewerProps) {
                             {isOwnFile && !props.isTrashCollection && (
                                 <button
                                     className="pswp__button pswp__button--custom"
-                                    title={t("DELETE_OPTION")}
+                                    title={t("delete_key")}
                                     onClick={() => {
                                         confirmTrashFile(
                                             photoSwipe?.currItem as EnteFile,
@@ -908,8 +908,8 @@ function PhotoViewer(props: PhotoViewerProps) {
                                         <button
                                             title={
                                                 isFav
-                                                    ? t("UNFAVORITE_OPTION")
-                                                    : t("FAVORITE_OPTION")
+                                                    ? t("unfavorite_key")
+                                                    : t("favorite_key")
                                             }
                                             className="pswp__button pswp__button--custom"
                                             onClick={() => {
