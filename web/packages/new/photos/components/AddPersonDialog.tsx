@@ -1,4 +1,4 @@
-import type { ModalVisibilityProps } from "@/base/components/mui";
+import type { ModalVisibilityProps } from "@/base/components/utils/modal";
 import { pt } from "@/base/i18n";
 import { addCGroup, addClusterToCGroup } from "@/new/photos/services/ml";
 import { ensure } from "@/utils/ensure";
@@ -13,7 +13,7 @@ import {
 import { t } from "i18next";
 import React, { useState } from "react";
 import type { FaceCluster } from "../services/ml/cluster";
-import type { Person } from "../services/ml/people";
+import type { CGroupPerson, Person } from "../services/ml/people";
 import { SpaceBetweenFlex, type ButtonishProps } from "./mui";
 import { DialogCloseIconButton } from "./mui/Dialog";
 import { SingleInputDialog } from "./SingleInputForm";
@@ -51,7 +51,7 @@ export const AddPersonDialog: React.FC<AddPersonDialogProps> = ({
 
     const [openNameInput, setOpenNameInput] = useState(false);
 
-    const cgroupPeople: Exclude<Person, { type: "cluster" }>[] = people.filter(
+    const cgroupPeople: CGroupPerson[] = people.filter(
         (p) => p.type != "cluster",
     );
 

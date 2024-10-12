@@ -1,27 +1,36 @@
-import { pt } from "@/base/i18n";
 import {
-    addCGroup,
-    deleteCGroup,
-    renameCGroup,
-} from "@/new/photos/services/ml";
-import { type Person } from "@/new/photos/services/ml/people";
+    useModalVisibility,
+    type ModalVisibilityProps,
+} from "@/base/components/utils/modal";
+import { useIsSmallWidth } from "@/base/hooks";
+import { pt } from "@/base/i18n";
+import { deleteCGroup, renameCGroup } from "@/new/photos/services/ml";
+import {
+    type CGroupPerson,
+    type ClusterPerson,
+    type Person,
+} from "@/new/photos/services/ml/people";
 import OverflowMenu from "@ente/shared/components/OverflowMenu/menu";
 import { OverflowMenuOption } from "@ente/shared/components/OverflowMenu/option";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
+import ListAltOutlined from "@mui/icons-material/ListAltOutlined";
 import MoreHoriz from "@mui/icons-material/MoreHoriz";
-import { IconButton, Stack, Tooltip } from "@mui/material";
+import {
+    Dialog,
+    DialogContent,
+    DialogTitle,
+    IconButton,
+    Stack,
+    Tooltip,
+} from "@mui/material";
 import { ClearIcon } from "@mui/x-date-pickers";
 import { t } from "i18next";
-import React, { useState } from "react";
-import type { FaceCluster } from "../../services/ml/cluster";
-import type { CGroup } from "../../services/user-entity";
+import React from "react";
 import { useAppContext } from "../../types/context";
 import { AddPersonDialog } from "../AddPersonDialog";
 import { SpaceBetweenFlex } from "../mui";
-import { NameInputDialog } from "../NameInputDialog";
 import { SingleInputDialog } from "../SingleInputForm";
-import { useWrapAsyncOperation } from "../use-wrap-async";
 import type { GalleryBarImplProps } from "./BarImpl";
 import { GalleryItemsHeaderAdapter, GalleryItemsSummary } from "./ListHeader";
 
@@ -61,48 +70,39 @@ export const PeopleHeader: React.FC<PeopleHeaderProps> = ({
     return (
         <GalleryItemsHeaderAdapter>
             <SpaceBetweenFlex>
-                <GalleryItemsSummary
-                    name={
-                        person.name ?? pt("Unnamed person") /* TODO-Cluster */
-                    }
-                    nameProps={person.name ? {} : { color: "text.muted" }}
-                    fileCount={person.fileIDs.length}
-                />
                 {person.type == "cgroup" ? (
-                    <CGroupPersonOptions
-                        cgroup={person.cgroup}
+                    <CGroupPersonHeader
+                        person={person}
                         {...{ onSelectPerson }}
                     />
                 ) : (
-                    <ClusterPersonOptions
-                        cluster={person.cluster}
-                        {...{ people }}
-                    />
+                    <ClusterPersonHeader person={person} {...{ people }} />
                 )}
             </SpaceBetweenFlex>
         </GalleryItemsHeaderAdapter>
     );
 };
 
-type CGroupPersonOptionsProps = Pick<PeopleHeaderProps, "onSelectPerson"> & {
-    cgroup: CGroup;
+type CGroupPersonHeaderProps = Pick<PeopleHeaderProps, "onSelectPerson"> & {
+    person: CGroupPerson;
 };
 
-const CGroupPersonOptions: React.FC<CGroupPersonOptionsProps> = ({
-    cgroup,
+const CGroupPersonHeader: React.FC<CGroupPersonHeaderProps> = ({
+    person,
     onSelectPerson,
 }) => {
+    const cgroup = person.cgroup;
+
     const { showMiniDialog } = useAppContext();
 
-    const [openAddNameInput, setOpenAddNameInput] = useState(false);
+    const { show: showNameInput, props: nameInputVisibilityProps } =
+        useModalVisibility();
+    const { show: showSuggestions, props: suggestionsVisibilityProps } =
+        useModalVisibility();
 
-    const handleRenamePerson = () => setOpenAddNameInput(true);
+    const handleRename = (name: string) => renameCGroup(cgroup, name);
 
-    const renamePersonUsingName = useWrapAsyncOperation((name: string) =>
-        renameCGroup(cgroup, name),
-    );
-
-    const handleDeletePerson = () =>
+    const handleReset = () =>
         showMiniDialog({
             title: pt("Reset person?"),
             message: pt(
@@ -111,18 +111,24 @@ const CGroupPersonOptions: React.FC<CGroupPersonOptionsProps> = ({
             continue: {
                 text: t("reset"),
                 color: "primary",
-                action: deletePerson,
+                action: async () => {
+                    await deleteCGroup(cgroup);
+                    // Reset the selection to the default state.
+                    onSelectPerson(undefined);
+                },
             },
         });
 
-    const deletePerson = useWrapAsyncOperation(async () => {
-        await deleteCGroup(cgroup);
-        // Reset the selection to the default state.
-        onSelectPerson(undefined);
-    });
+    // While technically it is possible for the cgroup not to have a name, logic
+    // wise we shouldn't be ending up here without a name.
+    const name = cgroup.data.name ?? "";
 
     return (
         <>
+            <GalleryItemsSummary
+                name={name}
+                fileCount={person.fileIDs.length}
+            />
             <OverflowMenu
                 ariaControls={"person-options"}
                 triggerButtonIcon={<MoreHoriz />}
@@ -130,74 +136,72 @@ const CGroupPersonOptions: React.FC<CGroupPersonOptionsProps> = ({
                 <OverflowMenuOption
                     startIcon={<EditIcon />}
                     centerAlign
-                    onClick={handleRenamePerson}
+                    onClick={showNameInput}
                 >
                     {t("rename")}
                 </OverflowMenuOption>
                 <OverflowMenuOption
                     startIcon={<ClearIcon />}
                     centerAlign
-                    onClick={handleDeletePerson}
+                    onClick={handleReset}
                 >
                     {pt("Reset")}
                 </OverflowMenuOption>
+                {process.env.NEXT_PUBLIC_ENTE_WIP_CL /* TODO-Cluster */ && (
+                    <OverflowMenuOption
+                        startIcon={<ListAltOutlined />}
+                        centerAlign
+                        onClick={showSuggestions}
+                    >
+                        {pt("Review suggestions")}
+                    </OverflowMenuOption>
+                )}
             </OverflowMenu>
 
             <SingleInputDialog
-                open={openAddNameInput}
-                onClose={() => setOpenAddNameInput(false)}
+                {...nameInputVisibilityProps}
                 title={pt("Rename person") /* TODO-Cluster pt()'s */}
                 label={pt("Name")}
                 placeholder={t("enter_name")}
                 autoComplete="name"
                 autoFocus
-                initialValue={cgroup.data.name ?? ""}
+                initialValue={name}
                 submitButtonTitle={t("rename")}
-                onSubmit={renamePersonUsingName}
+                onSubmit={handleRename}
+            />
+
+            <SuggestionsDialog
+                {...suggestionsVisibilityProps}
+                {...{ person }}
             />
         </>
     );
 };
 
-type ClusterPersonOptionsProps = Pick<PeopleHeaderProps, "people"> & {
-    cluster: FaceCluster;
+type ClusterPersonHeaderProps = Pick<PeopleHeaderProps, "people"> & {
+    person: ClusterPerson;
 };
 
-const ClusterPersonOptions: React.FC<ClusterPersonOptionsProps> = ({
+const ClusterPersonHeader: React.FC<ClusterPersonHeaderProps> = ({
     people,
-    cluster,
+    person,
 }) => {
-    const { startLoading, finishLoading } = useAppContext();
+    const cluster = person.cluster;
 
-    const [openNameInput, setOpenNameInput] = useState(false);
-    const [openAddPersonDialog, setOpenAddPersonDialog] = useState(false);
-
-    const handleAddPerson = () => {
-        // TODO-Cluster
-        if (process.env.NEXT_PUBLIC_ENTE_WIP_CL) {
-            // WIP path
-            setOpenAddPersonDialog(true);
-        } else {
-            // Existing path
-            setOpenNameInput(true);
-        }
-    };
-
-    // TODO-Cluster
-    const addPersonWithName = async (name: string) => {
-        startLoading();
-        try {
-            await addCGroup(name, cluster);
-        } finally {
-            finishLoading();
-        }
-    };
+    const { show: showAddPerson, props: addPersonVisibilityProps } =
+        useModalVisibility();
 
     return (
         <>
+            <GalleryItemsSummary
+                name={pt("Unnamed person") /* TODO-Cluster */}
+                nameProps={{ color: "text.muted" }}
+                fileCount={person.fileIDs.length}
+                onNameClick={showAddPerson}
+            />
             <Stack direction="row" sx={{ alignItems: "center", gap: 2 }}>
                 <Tooltip title={pt("Add a name")}>
-                    <IconButton onClick={handleAddPerson}>
+                    <IconButton onClick={showAddPerson}>
                         <AddIcon />
                     </IconButton>
                 </Tooltip>
@@ -209,28 +213,44 @@ const ClusterPersonOptions: React.FC<ClusterPersonOptionsProps> = ({
                     <OverflowMenuOption
                         startIcon={<AddIcon />}
                         centerAlign
-                        onClick={handleAddPerson}
+                        onClick={showAddPerson}
                     >
                         {pt("Add a name")}
                     </OverflowMenuOption>
                 </OverflowMenu>
             </Stack>
 
-            <NameInputDialog
-                open={openNameInput}
-                onClose={() => setOpenNameInput(false)}
-                title={pt("Add person") /* TODO-Cluster */}
-                placeholder={t("enter_name")}
-                initialValue={""}
-                submitButtonTitle={t("add")}
-                onSubmit={addPersonWithName}
-            />
-
             <AddPersonDialog
-                open={openAddPersonDialog}
-                onClose={() => setOpenAddPersonDialog(false)}
+                {...addPersonVisibilityProps}
                 {...{ people, cluster }}
             />
         </>
+    );
+};
+
+type SuggestionsDialogProps = ModalVisibilityProps & {
+    person: CGroupPerson;
+};
+
+const SuggestionsDialog: React.FC<SuggestionsDialogProps> = ({
+    person,
+    ...rest
+}) => {
+    const isSmallWidth = useIsSmallWidth();
+
+    console.log(person);
+    return (
+        <Dialog
+            {...rest}
+            maxWidth="sm"
+            fullWidth
+            fullScreen={isSmallWidth}
+            PaperProps={{ sx: { minHeight: "60svh" } }}
+        >
+            <DialogTitle sx={{ "&&&": { pt: "20px" } }}>
+                {pt(`${person.name}?`)}
+            </DialogTitle>
+            <DialogContent>Test</DialogContent>
+        </Dialog>
     );
 };
