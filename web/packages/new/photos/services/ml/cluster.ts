@@ -1,9 +1,9 @@
 import { assertionFailed } from "@/base/assert";
 import { newNonSecureID } from "@/base/id-worker";
 import log from "@/base/log";
+import type { EnteFile } from "@/media/file";
 import { ensure } from "@/utils/ensure";
 import { wait } from "@/utils/promise";
-import type { EnteFile } from "../../types/file";
 import { savedCGroups, updateOrCreateUserEntities } from "../user-entity";
 import { savedFaceClusters, saveFaceClusters } from "./db";
 import {
@@ -44,17 +44,6 @@ export type ClusterFace = Omit<Face, "embedding"> & {
     embedding: Float32Array;
     isBadFace: boolean;
 };
-
-export interface ClusterPreview {
-    clusterSize: number;
-    faces: ClusterPreviewFace[];
-}
-
-export interface ClusterPreviewFace {
-    face: ClusterFace;
-    cosineSimilarity: number;
-    wasMerged: boolean;
-}
 
 /**
  * Generates clusters from the given faces using a batched form of linear
