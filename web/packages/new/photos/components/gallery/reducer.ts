@@ -5,7 +5,10 @@ import {
 } from "@/media/collection";
 import type { EnteFile } from "@/media/file";
 import { mergeMetadata } from "@/media/file";
-import { isHiddenCollection } from "@/new/photos/services/collection";
+import {
+    createCollectionNameByID,
+    isHiddenCollection,
+} from "@/new/photos/services/collection";
 import { splitByPredicate } from "@/utils/array";
 import { ensure } from "@/utils/ensure";
 import type { User } from "@ente/shared/user/types";
@@ -15,20 +18,20 @@ import {
     ALL_SECTION,
     ARCHIVE_SECTION,
     DUMMY_UNCATEGORIZED_COLLECTION,
-    getDefaultHiddenCollectionIDs,
+    findDefaultHiddenCollectionIDs,
     HIDDEN_ITEMS_SECTION,
     isDefaultHiddenCollection,
     isIncomingShare,
     TRASH_SECTION,
 } from "../../services/collection";
 import type {
-    CollectionSummaries,
     CollectionSummary,
     CollectionSummaryType,
 } from "../../services/collection/ui";
 import {
+    createFileCollectionIDs,
     getLatestVersionFiles,
-    groupFilesBasedOnCollectionID,
+    groupFilesByCollectionID,
 } from "../../services/file";
 import { sortFiles } from "../../services/files";
 import {
@@ -38,6 +41,25 @@ import {
 } from "../../services/magic-metadata";
 import type { Person } from "../../services/ml/people";
 import type { FamilyData } from "../../services/user";
+
+/**
+ * Specifies what the bar at the top of the gallery is displaying currently.
+ */
+export type GalleryBarMode = "albums" | "hidden-albums" | "people";
+
+/**
+ * Specifies what the gallery is currently displaying.
+ *
+ * TODO: An experiment at consolidating state.
+ */
+export type GalleryFocus =
+    | {
+          type: "albums" | "hidden-albums";
+          activeCollectionID: number;
+          activeCollection: Collection | undefined;
+          activeCollectionSummary: CollectionSummary;
+      }
+    | { type: "people"; activePersonID: string; activePerson: Person };
 
 /**
  * Derived UI state backing the gallery.
@@ -75,14 +97,20 @@ export interface GalleryState {
     hiddenCollections: Collection[];
     /**
      * The user's normal (non-hidden, non-trash) files.
+     *
+     * The list is sorted so that newer files are first.
      */
     files: EnteFile[];
     /**
      * The user's hidden files.
+     *
+     * The list is sorted so that newer files are first.
      */
     hiddenFiles: EnteFile[];
     /**
      * The user's files that are in Trash.
+     *
+     * The list is sorted so that newer files are first.
      */
     trashedFiles: EnteFile[];
 
@@ -104,12 +132,23 @@ export interface GalleryState {
      * File IDs of all the files that the user has marked as a favorite.
      */
     favoriteFileIDs: Set<number>;
+    /**
+     * User visible collection names indexed by collection IDs for fast lookup.
+     *
+     * This map will contain entries for all (both normal and hidden)
+     * collections.
+     */
+    allCollectionNameByID: Map<number, string>;
+    /**
+     * A list of collection IDs to which a file belongs, indexed by file ID.
+     */
+    fileCollectionIDs: Map<number, number[]>;
 
     /*--<  Derived UI state  >--*/
 
     /**
-     * A map of massaged collections suitable for being directly consumed by the
-     * UI (indexed by the collection IDs).
+     * A map of collections massage to a form suitable for being directly
+     * consumed by the UI, indexed by the collection IDs.
      */
     collectionSummaries: Map<number, CollectionSummary>;
     /**
@@ -118,6 +157,18 @@ export interface GalleryState {
     hiddenCollectionSummaries: Map<number, CollectionSummary>;
 
     /*--<  Transient UI state  >--*/
+
+    /**
+     * If visible, what should the (sticky) gallery bar show.
+     */
+    barMode: GalleryBarMode | undefined;
+    /**
+     * The section / area, and the item within it, that the gallery is currently
+     * showing.
+     */
+    focus: GalleryFocus | undefined;
+    activeCollectionID: number | undefined;
+    activePersonID: string | undefined;
 
     filteredData: EnteFile[];
     /**
@@ -131,6 +182,28 @@ export interface GalleryState {
      * The list of people to show.
      */
     people: Person[] | undefined;
+    /**
+     * `true` if we are in "search mode".
+     *
+     * We will always be in search mode if we are showing search results, but we
+     * also may be in search mode earlier on smaller screens, where the search
+     * input is only shown on entering search mode. See: [Note: "Search mode"].
+     *
+     * That is, {@link isInSearchMode} may be true even when
+     * {@link searchResults} is undefined.
+     */
+    isInSearchMode: boolean;
+    /**
+     * List of files that match the selected search option.
+     *
+     * This will be set only if we are showing search results.
+     *
+     * The search dropdown shows a list of options ("suggestions") that match
+     * the user's search term. If the user selects from one of these options,
+     * then we run a search to find all files that match that suggestion, and
+     * set this value to the result.
+     */
+    searchResults: EnteFile[] | undefined;
 }
 
 export type GalleryAction =
@@ -164,7 +237,18 @@ export type GalleryAction =
     | { type: "uploadFile"; file: EnteFile }
     | { type: "resetHiddenFiles"; hiddenFiles: EnteFile[] }
     | { type: "fetchHiddenFiles"; hiddenFiles: EnteFile[] }
-    | { type: "setTrashedFiles"; trashedFiles: EnteFile[] };
+    | { type: "setTrashedFiles"; trashedFiles: EnteFile[] }
+    | { type: "showAll" }
+    | { type: "showHidden" }
+    | {
+          type: "showNormalOrHiddenCollectionSummary";
+          collectionSummaryID: number | undefined;
+      }
+    | { type: "showPeople" }
+    | { type: "showPerson"; personID: string }
+    | { type: "searchResults"; searchResults: EnteFile[] }
+    | { type: "enterSearchMode" }
+    | { type: "exitSearch" };
 
 const initialGalleryState: GalleryState = {
     user: undefined,
@@ -178,11 +262,19 @@ const initialGalleryState: GalleryState = {
     defaultHiddenCollectionIDs: new Set(),
     hiddenFileIDs: new Set(),
     favoriteFileIDs: new Set(),
+    allCollectionNameByID: new Map(),
+    fileCollectionIDs: new Map(),
     collectionSummaries: new Map(),
     hiddenCollectionSummaries: new Map(),
+    barMode: undefined,
+    focus: undefined,
+    activeCollectionID: undefined,
+    activePersonID: undefined,
     filteredData: [],
     activePerson: undefined,
     people: [],
+    isInSearchMode: false,
+    searchResults: undefined,
 };
 
 const galleryReducer: React.Reducer<GalleryState, GalleryAction> = (
@@ -217,6 +309,10 @@ const galleryReducer: React.Reducer<GalleryState, GalleryAction> = (
                     collections,
                     action.files,
                 ),
+                allCollectionNameByID: createCollectionNameByID(
+                    action.allCollections,
+                ),
+                fileCollectionIDs: createFileCollectionIDs(action.files),
                 collectionSummaries: deriveCollectionSummaries(
                     action.user,
                     collections,
@@ -250,6 +346,9 @@ const galleryReducer: React.Reducer<GalleryState, GalleryAction> = (
                     action.collections,
                     state.files,
                 ),
+                allCollectionNameByID: createCollectionNameByID(
+                    action.collections.concat(state.hiddenCollections),
+                ),
                 collectionSummaries: deriveCollectionSummaries(
                     ensure(state.user),
                     action.collections,
@@ -275,6 +374,9 @@ const galleryReducer: React.Reducer<GalleryState, GalleryAction> = (
                     action.collections,
                     state.files,
                 ),
+                allCollectionNameByID: createCollectionNameByID(
+                    action.collections.concat(action.hiddenCollections),
+                ),
                 collectionSummaries: deriveCollectionSummaries(
                     ensure(state.user),
                     action.collections,
@@ -298,6 +400,7 @@ const galleryReducer: React.Reducer<GalleryState, GalleryAction> = (
                     state.collections,
                     files,
                 ),
+                fileCollectionIDs: createFileCollectionIDs(action.files),
                 collectionSummaries: deriveCollectionSummaries(
                     ensure(state.user),
                     state.collections,
@@ -320,6 +423,7 @@ const galleryReducer: React.Reducer<GalleryState, GalleryAction> = (
                     state.collections,
                     files,
                 ),
+                fileCollectionIDs: createFileCollectionIDs(action.files),
                 collectionSummaries: deriveCollectionSummaries(
                     ensure(state.user),
                     state.collections,
@@ -338,6 +442,7 @@ const galleryReducer: React.Reducer<GalleryState, GalleryAction> = (
                     state.collections,
                     files,
                 ),
+                fileCollectionIDs: createFileCollectionIDs(files),
                 // TODO: Consider batching this instead of doing it per file
                 // upload to speed up uploads. Perf test first though.
                 collectionSummaries: deriveCollectionSummaries(
@@ -394,6 +499,65 @@ const galleryReducer: React.Reducer<GalleryState, GalleryAction> = (
                     state.archivedCollectionIDs,
                 ),
             };
+        case "showAll":
+            return {
+                ...state,
+                barMode: "albums",
+                activeCollectionID: ALL_SECTION,
+                isInSearchMode: false,
+                searchResults: undefined,
+            };
+        case "showHidden":
+            return {
+                ...state,
+                barMode: "hidden-albums",
+                activeCollectionID: HIDDEN_ITEMS_SECTION,
+                isInSearchMode: false,
+                searchResults: undefined,
+            };
+        case "showNormalOrHiddenCollectionSummary":
+            return {
+                ...state,
+                barMode:
+                    action.collectionSummaryID !== undefined &&
+                    state.hiddenCollectionSummaries.has(
+                        action.collectionSummaryID,
+                    )
+                        ? "hidden-albums"
+                        : "albums",
+                activeCollectionID: action.collectionSummaryID ?? ALL_SECTION,
+                isInSearchMode: false,
+                searchResults: undefined,
+            };
+        case "showPeople":
+            return {
+                ...state,
+                barMode: "people",
+                activePersonID: undefined,
+                isInSearchMode: false,
+                searchResults: undefined,
+            };
+        case "showPerson":
+            return {
+                ...state,
+                barMode: "people",
+                activePersonID: action.personID,
+                isInSearchMode: false,
+                searchResults: undefined,
+            };
+        case "enterSearchMode":
+            return { ...state, isInSearchMode: true };
+        case "searchResults":
+            return {
+                ...state,
+                searchResults: action.searchResults,
+            };
+        case "exitSearch":
+            return {
+                ...state,
+                isInSearchMode: false,
+                searchResults: undefined,
+            };
     }
 };
 
@@ -411,8 +575,8 @@ export const useGalleryReducer = () =>
  * have two "Collection File" entries for it, both with the same file ID, but
  * with different collection IDs.
  *
- * This function returns files such that only one of these entries (arbitrarily
- * picked in case of dupes) is returned.
+ * This function returns files such that only one of these entries (the newer
+ * one in case of dupes) is returned.
  */
 export const uniqueFilesByID = (files: EnteFile[]) => {
     const seen = new Set<number>();
@@ -438,7 +602,7 @@ const deriveArchivedCollectionIDs = (collections: Collection[]) =>
  * dependencies.
  */
 const deriveDefaultHiddenCollectionIDs = (hiddenCollections: Collection[]) =>
-    getDefaultHiddenCollectionIDs(hiddenCollections);
+    findDefaultHiddenCollectionIDs(hiddenCollections);
 
 /**
  * Helper function to compute hidden file IDs from their dependencies.
@@ -481,18 +645,43 @@ export const deriveCollectionSummaries = (
         files,
     );
 
-    const sectionSummaries = getSectionSummaries(
+    const allSectionFiles = findAllSectionVisibleFiles(
         files,
-        trashedFiles,
         archivedCollectionIDs,
     );
-
-    for (const [key, value] of sectionSummaries) {
-        collectionSummaries.set(key, value);
-    }
+    collectionSummaries.set(ALL_SECTION, {
+        ...pseudoCollectionOptionsForFiles(allSectionFiles),
+        id: ALL_SECTION,
+        type: "all",
+        name: t("section_all"),
+    });
+    collectionSummaries.set(TRASH_SECTION, {
+        ...pseudoCollectionOptionsForFiles(trashedFiles),
+        id: TRASH_SECTION,
+        name: t("section_trash"),
+        type: "trash",
+        coverFile: undefined,
+    });
+    const archivedFiles = uniqueFilesByID(
+        files.filter((file) => isArchivedFile(file)),
+    );
+    collectionSummaries.set(ARCHIVE_SECTION, {
+        ...pseudoCollectionOptionsForFiles(archivedFiles),
+        id: ARCHIVE_SECTION,
+        name: t("section_archive"),
+        type: "archive",
+        coverFile: undefined,
+    });
 
     return collectionSummaries;
 };
+
+const pseudoCollectionOptionsForFiles = (files: EnteFile[]) => ({
+    coverFile: files[0],
+    latestFile: files[0],
+    fileCount: files.length,
+    updationTime: files[0]?.updationTime,
+});
 
 /**
  * Helper function to compute hidden collection summaries from their
@@ -508,11 +697,18 @@ export const deriveHiddenCollectionSummaries = (
         hiddenCollections,
         hiddenFiles,
     );
-    const hiddenItemsSummaries = getHiddenItemsSummary(
-        hiddenFiles,
-        hiddenCollections,
+
+    const dhcIDs = findDefaultHiddenCollectionIDs(hiddenCollections);
+    const defaultHiddenFiles = uniqueFilesByID(
+        hiddenFiles.filter((file) => dhcIDs.has(file.collectionID)),
     );
-    hiddenCollectionSummaries.set(HIDDEN_ITEMS_SECTION, hiddenItemsSummaries);
+    hiddenCollectionSummaries.set(HIDDEN_ITEMS_SECTION, {
+        ...pseudoCollectionOptionsForFiles(defaultHiddenFiles),
+        id: HIDDEN_ITEMS_SECTION,
+        name: t("hidden_items"),
+        type: "hiddenItems",
+    });
+
     return hiddenCollectionSummaries;
 };
 
@@ -520,20 +716,18 @@ const createCollectionSummaries = (
     user: User,
     collections: Collection[],
     files: EnteFile[],
-): CollectionSummaries => {
-    const collectionSummaries: CollectionSummaries = new Map();
-    const collectionLatestFiles = getCollectionLatestFiles(files);
-    const collectionCoverFiles = getCollectionCoverFiles(files, collections);
-    const collectionFilesCount = getCollectionsFileCount(files);
+) => {
+    const collectionSummaries = new Map<number, CollectionSummary>();
+
+    const filesByCollection = groupFilesByCollectionID(files);
+    const coverFiles = findCoverFiles(collections, filesByCollection);
 
     let hasUncategorizedCollection = false;
     for (const collection of collections) {
-        if (
-            !hasUncategorizedCollection &&
-            collection.type === CollectionType.uncategorized
-        ) {
+        if (collection.type === CollectionType.uncategorized) {
             hasUncategorizedCollection = true;
         }
+
         let type: CollectionSummaryType;
         if (isIncomingShare(collection, user)) {
             if (isIncomingCollabShare(collection, user)) {
@@ -571,306 +765,100 @@ const createCollectionSummaries = (
             }
         }
 
-        let CollectionSummaryItemName: string;
+        let name: string;
         if (type == "uncategorized") {
-            CollectionSummaryItemName = t("section_uncategorized");
+            name = t("section_uncategorized");
         } else if (type == "favorites") {
-            CollectionSummaryItemName = t("favorites");
+            name = t("favorites");
         } else {
-            CollectionSummaryItemName = collection.name;
+            name = collection.name;
         }
 
+        const collectionFiles = filesByCollection.get(collection.id);
         collectionSummaries.set(collection.id, {
             id: collection.id,
-            name: CollectionSummaryItemName,
-            // See: [Note: strict mode migration]
-            //
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-ignore
-            latestFile: collectionLatestFiles.get(collection.id),
-            coverFile: collectionCoverFiles.get(collection.id),
-            fileCount: collectionFilesCount.get(collection.id) ?? 0,
+            type,
+            name,
+            latestFile: collectionFiles?.[0],
+            coverFile: coverFiles.get(collection.id),
+            fileCount: collectionFiles?.length ?? 0,
             updationTime: collection.updationTime,
-            type: type,
             // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
             order: collection.magicMetadata?.data?.order ?? 0,
         });
     }
 
     if (!hasUncategorizedCollection) {
-        collectionSummaries.set(
-            DUMMY_UNCATEGORIZED_COLLECTION,
-            getDummyUncategorizedCollectionSummary(),
-        );
+        collectionSummaries.set(DUMMY_UNCATEGORIZED_COLLECTION, {
+            ...pseudoCollectionOptionsForFiles([]),
+            id: DUMMY_UNCATEGORIZED_COLLECTION,
+            type: "uncategorized",
+            name: t("section_uncategorized"),
+        });
     }
 
     return collectionSummaries;
 };
 
-export type CollectionToFileMap = Map<number, EnteFile>;
-
-const getCollectionLatestFiles = (files: EnteFile[]): CollectionToFileMap => {
-    const latestFiles = new Map<number, EnteFile>();
-
-    files.forEach((file) => {
-        if (!latestFiles.has(file.collectionID)) {
-            latestFiles.set(file.collectionID, file);
-        }
-    });
-    return latestFiles;
-};
-
-const getCollectionCoverFiles = (
-    files: EnteFile[],
+const findCoverFiles = (
     collections: Collection[],
-): CollectionToFileMap => {
-    const collectionIDToFileMap = groupFilesBasedOnCollectionID(files);
-
+    filesByCollection: Map<number, EnteFile[]>,
+): Map<number, EnteFile> => {
     const coverFiles = new Map<number, EnteFile>();
+    for (const collection of collections) {
+        const collectionFiles = filesByCollection.get(collection.id);
+        if (!collectionFiles || collectionFiles.length == 0) continue;
 
-    collections.forEach((collection) => {
-        const collectionFiles = collectionIDToFileMap.get(collection.id);
-        if (!collectionFiles || collectionFiles.length === 0) {
-            return;
-        }
+        let coverFile: EnteFile | undefined;
+
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         const coverID = collection.pubMagicMetadata?.data?.coverID;
         if (typeof coverID === "number" && coverID > 0) {
-            const coverFile = collectionFiles.find(
-                (file) => file.id === coverID,
-            );
-            if (coverFile) {
-                coverFiles.set(collection.id, coverFile);
-                return;
+            coverFile = collectionFiles.find(({ id }) => id === coverID);
+        }
+
+        if (!coverFile) {
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+            if (collection.pubMagicMetadata?.data?.asc) {
+                coverFile = collectionFiles[collectionFiles.length - 1];
+            } else {
+                coverFile = collectionFiles[0];
             }
         }
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        if (collection.pubMagicMetadata?.data?.asc) {
-            coverFiles.set(
-                collection.id,
-                // See: [Note: strict mode migration]
-                //
-                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-ignore
-                collectionFiles[collectionFiles.length - 1],
-            );
-        } else {
-            // See: [Note: strict mode migration]
-            //
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-ignore
-            coverFiles.set(collection.id, collectionFiles[0]);
+
+        if (coverFile) {
+            coverFiles.set(collection.id, coverFile);
         }
-    });
+    }
     return coverFiles;
 };
 
-function isIncomingCollabShare(collection: Collection, user: User) {
+const isIncomingCollabShare = (collection: Collection, user: User) => {
     // TODO: Need to audit the types
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     const sharee = collection.sharees?.find((sharee) => sharee.id === user.id);
     return sharee?.role === COLLECTION_ROLE.COLLABORATOR;
-}
+};
 
-function isOutgoingShare(collection: Collection, user: User): boolean {
+const isOutgoingShare = (collection: Collection, user: User) =>
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    return collection.owner.id === user.id && collection.sharees?.length > 0;
-}
+    collection.owner.id === user.id && collection.sharees?.length > 0;
 
-function isSharedOnlyViaLink(collection: Collection) {
+const isSharedOnlyViaLink = (collection: Collection) =>
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    return collection.publicURLs?.length && !collection.sharees?.length;
-}
+    collection.publicURLs?.length && !collection.sharees?.length;
 
-function getDummyUncategorizedCollectionSummary(): CollectionSummary {
-    return {
-        id: DUMMY_UNCATEGORIZED_COLLECTION,
-        name: t("section_uncategorized"),
-        type: "uncategorized",
-        // See: [Note: strict mode migration]
-        //
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
-        latestFile: null,
-        // See: [Note: strict mode migration]
-        //
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
-        coverFile: null,
-        fileCount: 0,
-        updationTime: 0,
-    };
-}
-
-function getHiddenItemsSummary(
-    hiddenFiles: EnteFile[],
-    hiddenCollections: Collection[],
-): CollectionSummary {
-    const defaultHiddenCollectionIds = new Set(
-        hiddenCollections
-            .filter((collection) => isDefaultHiddenCollection(collection))
-            .map((collection) => collection.id),
-    );
-    const hiddenItems = uniqueFilesByID(
-        hiddenFiles.filter((file) =>
-            defaultHiddenCollectionIds.has(file.collectionID),
+/**
+ * Return all list of files that should be shown in the "All" section.
+ */
+const findAllSectionVisibleFiles = (
+    files: EnteFile[],
+    archivedCollectionIDs: Set<number>,
+) =>
+    uniqueFilesByID(
+        files.filter(
+            (file) =>
+                !isArchivedFile(file) &&
+                !archivedCollectionIDs.has(file.collectionID),
         ),
     );
-    return {
-        id: HIDDEN_ITEMS_SECTION,
-        name: t("hidden_items"),
-        type: "hiddenItems",
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        coverFile: hiddenItems?.[0],
-        // See: [Note: strict mode migration]
-        //
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        latestFile: hiddenItems?.[0],
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        fileCount: hiddenItems?.length,
-        // See: [Note: strict mode migration]
-        //
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        updationTime: hiddenItems?.[0]?.updationTime,
-    };
-}
-
-function getSectionSummaries(
-    files: EnteFile[],
-    trashedFiles: EnteFile[],
-    archivedCollections: Set<number>,
-): CollectionSummaries {
-    const collectionSummaries: CollectionSummaries = new Map();
-    collectionSummaries.set(
-        ALL_SECTION,
-        getAllSectionSummary(files, archivedCollections),
-    );
-    collectionSummaries.set(
-        TRASH_SECTION,
-        getTrashedCollectionSummary(trashedFiles),
-    );
-    collectionSummaries.set(ARCHIVE_SECTION, getArchivedSectionSummary(files));
-
-    return collectionSummaries;
-}
-
-function getArchivedSectionSummary(files: EnteFile[]): CollectionSummary {
-    const archivedFiles = uniqueFilesByID(
-        files.filter((file) => isArchivedFile(file)),
-    );
-    return {
-        id: ARCHIVE_SECTION,
-        name: t("section_archive"),
-        type: "archive",
-        // See: [Note: strict mode migration]
-        //
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
-        coverFile: null,
-        // See: [Note: strict mode migration]
-        //
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        latestFile: archivedFiles?.[0],
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        fileCount: archivedFiles?.length ?? 0,
-        // See: [Note: strict mode migration]
-        //
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        updationTime: archivedFiles?.[0]?.updationTime,
-    };
-}
-
-function getAllSectionSummary(
-    files: EnteFile[],
-    archivedCollections: Set<number>,
-): CollectionSummary {
-    const allSectionFiles = getAllSectionVisibleFiles(
-        files,
-        archivedCollections,
-    );
-    return {
-        id: ALL_SECTION,
-        name: t("section_all"),
-        type: "all",
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        coverFile: allSectionFiles?.[0],
-        // See: [Note: strict mode migration]
-        //
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        latestFile: allSectionFiles?.[0],
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        fileCount: allSectionFiles?.length || 0,
-        // See: [Note: strict mode migration]
-        //
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        updationTime: allSectionFiles?.[0]?.updationTime,
-    };
-}
-
-function getCollectionsFileCount(files: EnteFile[]): Map<number, number> {
-    const collectionIDToFileMap = groupFilesBasedOnCollectionID(files);
-    const collectionFilesCount = new Map<number, number>();
-    for (const [id, files] of collectionIDToFileMap) {
-        collectionFilesCount.set(id, files.length);
-    }
-    return collectionFilesCount;
-}
-
-function getAllSectionVisibleFiles(
-    files: EnteFile[],
-    archivedCollections: Set<number>,
-): EnteFile[] {
-    const allSectionVisibleFiles = uniqueFilesByID(
-        files.filter((file) => {
-            if (
-                isArchivedFile(file) ||
-                archivedCollections.has(file.collectionID)
-            ) {
-                return false;
-            }
-            return true;
-        }),
-    );
-    return allSectionVisibleFiles;
-}
-
-function getTrashedCollectionSummary(
-    trashedFiles: EnteFile[],
-): CollectionSummary {
-    return {
-        id: TRASH_SECTION,
-        name: t("section_trash"),
-        type: "trash",
-        // See: [Note: strict mode migration]
-        //
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
-        coverFile: null,
-        // See: [Note: strict mode migration]
-        //
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        latestFile: trashedFiles?.[0],
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        fileCount: trashedFiles?.length,
-        // See: [Note: strict mode migration]
-        //
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        updationTime: trashedFiles?.[0]?.updationTime,
-    };
-}
