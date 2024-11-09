@@ -7,7 +7,7 @@ import { ensureElectron } from "@/base/electron";
 import { basename, dirname } from "@/base/file";
 import type { CollectionMapping, FolderWatch } from "@/base/types/ipc";
 import { CollectionMappingChoiceDialog } from "@/new/photos/components/CollectionMappingChoiceDialog";
-import { AppContext } from "@/new/photos/types/context";
+import { AppContext, useAppContext } from "@/new/photos/types/context";
 import { ensure } from "@/utils/ensure";
 import {
     FlexWrapper,
@@ -234,20 +234,16 @@ interface WatchEntryProps {
 }
 
 const WatchEntry: React.FC<WatchEntryProps> = ({ watch, removeWatch }) => {
-    const appContext = React.useContext(AppContext);
+    const { showMiniDialog } = useAppContext();
 
     const confirmStopWatching = () => {
-        appContext.setDialogMessage({
-            title: t("STOP_WATCHING_FOLDER"),
-            content: t("STOP_WATCHING_DIALOG_MESSAGE"),
-            close: {
-                text: t("cancel"),
-                variant: "secondary",
-            },
-            proceed: {
-                action: () => removeWatch(watch),
+        showMiniDialog({
+            title: t("stop_watching_folder_title"),
+            message: t("stop_watching_folder_message"),
+            continue: {
                 text: t("YES_STOP"),
-                variant: "critical",
+                color: "critical",
+                action: () => removeWatch(watch),
             },
         });
     };
@@ -329,7 +325,7 @@ const EntryOptions: React.FC<EntryOptionsProps> = ({ confirmStopWatching }) => {
                 onClick={confirmStopWatching}
                 startIcon={<DoNotDisturbOutlinedIcon />}
             >
-                {t("STOP_WATCHING")}
+                {t("stop_watching")}
             </OverflowMenuOption>
         </OverflowMenu>
     );

@@ -1,10 +1,35 @@
-import { genericRetriableErrorDialogAttributes } from "@/base/components/utils/dialog";
-import log from "@/base/log";
 import {
-    getTotalFamilyUsage,
-    isPartOfFamily,
-} from "@/new/photos/services/user";
-import { AppContext } from "@/new/photos/types/context";
+    errorDialogAttributes,
+    genericRetriableErrorDialogAttributes,
+} from "@/base/components/utils/dialog";
+import type { ModalVisibilityProps } from "@/base/components/utils/modal";
+import log from "@/base/log";
+import { useUserDetailsSnapshot } from "@/new/photos/components/utils/use-snapshot";
+import { useWrapAsyncOperation } from "@/new/photos/components/utils/use-wrap-async";
+import type {
+    Bonus,
+    Plan,
+    PlanPeriod,
+    PlansData,
+    Subscription,
+} from "@/new/photos/services/user-details";
+import {
+    activateStripeSubscription,
+    cancelStripeSubscription,
+    getFamilyPortalRedirectURL,
+    getPlansData,
+    isSubscriptionActive,
+    isSubscriptionActivePaid,
+    isSubscriptionCancelled,
+    isSubscriptionForPlan,
+    isSubscriptionFree,
+    isSubscriptionStripe,
+    planUsage,
+    redirectToCustomerPortal,
+    redirectToPaymentsApp,
+    userDetailsAddOnBonuses,
+} from "@/new/photos/services/user-details";
+import { AppContext, useAppContext } from "@/new/photos/types/context";
 import { bytesInGB, formattedStorageByteSize } from "@/new/photos/utils/units";
 import { openURL } from "@/new/photos/utils/web";
 import {
@@ -12,7 +37,6 @@ import {
     FluidContainer,
     SpaceBetweenFlex,
 } from "@ente/shared/components/Container";
-import { getData, LS_KEYS } from "@ente/shared/storage/localStorage";
 import ArrowForward from "@mui/icons-material/ArrowForward";
 import ChevronRight from "@mui/icons-material/ChevronRight";
 import Close from "@mui/icons-material/Close";
@@ -33,49 +57,28 @@ import {
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import { t } from "i18next";
-import { useContext, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useContext, useEffect, useState } from "react";
 import { Trans } from "react-i18next";
-import billingService, { type PlansResponse } from "services/billingService";
-import { getFamilyPortalRedirectURL } from "services/userService";
-import { Plan, PLAN_PERIOD, Subscription } from "types/billing";
 import { SetLoading } from "types/gallery";
-import { BonusData, UserDetails } from "types/user";
-import {
-    activateSubscription,
-    cancelSubscription,
-    getLocalUserSubscription,
-    hasAddOnBonus,
-    hasPaidSubscription,
-    hasStripeSubscription,
-    isOnFreePlan,
-    isPopularPlan,
-    isSubscriptionActive,
-    isSubscriptionCancelled,
-    isUserSubscribedPlan,
-    planForSubscription,
-    planSelectionOutcome,
-    updatePaymentMethod,
-    updateSubscription,
-} from "utils/billing";
 
-interface PlanSelectorProps {
-    modalView: boolean;
-    closeModal: any;
+type PlanSelectorProps = ModalVisibilityProps & {
     setLoading: SetLoading;
-}
+};
 
-function PlanSelector(props: PlanSelectorProps) {
+const PlanSelector: React.FC<PlanSelectorProps> = ({
+    open,
+    onClose,
+    setLoading,
+}: PlanSelectorProps) => {
     const fullScreen = useMediaQuery(useTheme().breakpoints.down("sm"));
 
-    if (!props.modalView) {
+    if (!open) {
         return <></>;
     }
 
     return (
         <Dialog
-            {...{ fullScreen }}
-            open={props.modalView}
-            onClose={props.closeModal}
+            {...{ open, onClose, fullScreen }}
             PaperProps={{
                 sx: (theme) => ({
                     width: { sm: "391px" },
@@ -84,154 +87,136 @@ function PlanSelector(props: PlanSelectorProps) {
                 }),
             }}
         >
-            <PlanSelectorCard
-                closeModal={props.closeModal}
-                setLoading={props.setLoading}
-            />
+            <PlanSelectorCard {...{ onClose, setLoading }} />
         </Dialog>
     );
-}
+};
 
 export default PlanSelector;
 
 interface PlanSelectorCardProps {
-    closeModal: any;
+    onClose: () => void;
     setLoading: SetLoading;
 }
 
-function PlanSelectorCard(props: PlanSelectorCardProps) {
-    const subscription = useMemo(() => getLocalUserSubscription(), []);
-    const [plansResponse, setPlansResponse] = useState<
-        PlansResponse | undefined
-    >();
+const PlanSelectorCard: React.FC<PlanSelectorCardProps> = ({
+    onClose,
+    setLoading,
+}) => {
+    const { showMiniDialog } = useContext(AppContext);
 
-    const [planPeriod, setPlanPeriod] = useState<PLAN_PERIOD>(
-        subscription?.period || PLAN_PERIOD.MONTH,
+    const userDetails = useUserDetailsSnapshot();
+
+    const [plansData, setPlansData] = useState<PlansData | undefined>();
+    const [planPeriod, setPlanPeriod] = useState<PlanPeriod | undefined>(
+        userDetails?.subscription?.period ?? "month",
     );
-    const { showMiniDialog, setDialogMessage } = useContext(AppContext);
-    const bonusData = useMemo(() => {
-        const userDetails = getLocalUserDetails();
-        if (!userDetails) {
-            return null;
-        }
-        return userDetails.bonusData;
-    }, []);
 
-    const usage = useMemo(() => {
-        const userDetails = getLocalUserDetails();
-        if (!userDetails) {
-            return 0;
-        }
-        return isPartOfFamily(userDetails.familyData)
-            ? getTotalFamilyUsage(userDetails.familyData)
-            : userDetails.usage;
-    }, []);
+    const usage = userDetails ? planUsage(userDetails) : 0;
+    const subscription = userDetails?.subscription;
+    const addOnBonuses = userDetails
+        ? userDetailsAddOnBonuses(userDetails)
+        : [];
 
-    const togglePeriod = () => {
-        setPlanPeriod((prevPeriod) =>
-            prevPeriod === PLAN_PERIOD.MONTH
-                ? PLAN_PERIOD.YEAR
-                : PLAN_PERIOD.MONTH,
-        );
-    };
+    const togglePeriod = useCallback(
+        () => setPlanPeriod((prev) => (prev == "month" ? "year" : "month")),
+        [],
+    );
+
     useEffect(() => {
         const main = async () => {
             try {
-                props.setLoading(true);
-                const response = await billingService.getPlans();
-                const { plans } = response;
-                if (isSubscriptionActive(subscription)) {
-                    const planNotListed =
-                        plans.filter((plan) =>
-                            isUserSubscribedPlan(plan, subscription),
-                        ).length === 0;
-                    if (
-                        subscription &&
-                        !isOnFreePlan(subscription) &&
-                        planNotListed
-                    ) {
-                        plans.push(planForSubscription(subscription));
+                setLoading(true);
+                const plansData = await getPlansData();
+                const { plans } = plansData;
+                if (subscription && isSubscriptionActive(subscription)) {
+                    const activePlan = plans.find((plan) =>
+                        isSubscriptionForPlan(subscription, plan),
+                    );
+                    if (!isSubscriptionFree(subscription) && !activePlan) {
+                        plans.push({
+                            id: subscription.productID,
+                            storage: subscription.storage,
+                            price: subscription.price,
+                            period: subscription.period,
+                            stripeID: subscription.productID,
+                            iosID: subscription.productID,
+                            androidID: subscription.productID,
+                        });
                     }
                 }
-                setPlansResponse(response);
+                setPlansData(plansData);
             } catch (e) {
-                log.error("plan selector modal open failed", e);
-                props.closeModal();
+                log.error("Failed to get plans", e);
+                onClose();
                 showMiniDialog(genericRetriableErrorDialogAttributes());
             } finally {
-                props.setLoading(false);
+                setLoading(false);
             }
         };
         main();
     }, []);
 
-    async function onPlanSelect(plan: Plan) {
+    const handlePlanSelect = async (plan: Plan) => {
         switch (planSelectionOutcome(subscription)) {
             case "buyPlan":
                 try {
-                    props.setLoading(true);
-                    await billingService.buySubscription(plan.stripeID);
+                    setLoading(true);
+                    await redirectToPaymentsApp(plan.stripeID, "buy");
                 } catch (e) {
-                    props.setLoading(false);
-                    setDialogMessage({
-                        title: t("error"),
-                        content: t("SUBSCRIPTION_PURCHASE_FAILED"),
-                        close: { variant: "critical" },
-                    });
+                    setLoading(false);
+                    showMiniDialog(
+                        errorDialogAttributes(
+                            t("subscription_purchase_failed"),
+                        ),
+                    );
                 }
                 break;
 
             case "updateSubscriptionToPlan":
-                setDialogMessage({
+                showMiniDialog({
                     title: t("update_subscription_title"),
-                    content: t("UPDATE_SUBSCRIPTION_MESSAGE"),
-                    proceed: {
-                        text: t("UPDATE_SUBSCRIPTION"),
-                        action: updateSubscription.bind(
-                            null,
-                            plan,
-                            setDialogMessage,
-                            props.setLoading,
-                            props.closeModal,
-                        ),
-                        variant: "accent",
+                    message: t("update_subscription_message"),
+                    continue: {
+                        text: t("update_subscription"),
+                        action: () =>
+                            redirectToPaymentsApp(plan.stripeID, "update"),
                     },
-                    close: { text: t("cancel") },
                 });
                 break;
 
             case "cancelOnMobile":
-                setDialogMessage({
-                    title: t("CANCEL_SUBSCRIPTION_ON_MOBILE"),
-                    content: t("CANCEL_SUBSCRIPTION_ON_MOBILE_MESSAGE"),
-                    close: { variant: "secondary" },
+                showMiniDialog({
+                    title: t("cancel_subscription_on_mobile"),
+                    message: t("cancel_subscription_on_mobile_message"),
+                    continue: {},
+                    cancel: false,
                 });
                 break;
 
             case "contactSupport":
-                setDialogMessage({
-                    title: t("MANAGE_PLAN"),
-                    content: (
+                showMiniDialog({
+                    title: t("manage_plan"),
+                    message: (
                         <Trans
-                            i18nKey={"MAIL_TO_MANAGE_SUBSCRIPTION"}
+                            i18nKey={"mail_to_manage_subscription"}
                             components={{
                                 a: <Link href="mailto:support@ente.io" />,
                             }}
                             values={{ emailID: "support@ente.io" }}
                         />
                     ),
-                    close: { variant: "secondary" },
+                    continue: {},
+                    cancel: false,
                 });
                 break;
         }
-    }
-
-    const { closeModal, setLoading } = props;
+    };
 
     const commonCardData = {
         subscription,
-        bonusData,
-        closeModal,
+        addOnBonuses,
+        closeModal: onClose,
         planPeriod,
         togglePeriod,
         setLoading,
@@ -239,39 +224,74 @@ function PlanSelectorCard(props: PlanSelectorCardProps) {
 
     const plansList = (
         <Plans
-            plansResponse={plansResponse}
+            plansData={plansData}
             planPeriod={planPeriod}
-            onPlanSelect={onPlanSelect}
+            onPlanSelect={handlePlanSelect}
             subscription={subscription}
-            bonusData={bonusData}
-            closeModal={closeModal}
+            hasAddOnBonus={addOnBonuses.length > 0}
+            closeModal={onClose}
         />
     );
 
     return (
-        <>
-            <Stack spacing={3} p={1.5}>
-                {hasPaidSubscription(subscription) ? (
-                    <PaidSubscriptionPlanSelectorCard
-                        {...commonCardData}
-                        usage={usage}
-                    >
-                        {plansList}
-                    </PaidSubscriptionPlanSelectorCard>
-                ) : (
-                    <FreeSubscriptionPlanSelectorCard {...commonCardData}>
-                        {plansList}
-                    </FreeSubscriptionPlanSelectorCard>
-                )}
-            </Stack>
-        </>
+        <Stack spacing={3} p={1.5}>
+            {subscription && isSubscriptionActivePaid(subscription) ? (
+                <PaidSubscriptionPlanSelectorCard
+                    {...commonCardData}
+                    usage={usage}
+                >
+                    {plansList}
+                </PaidSubscriptionPlanSelectorCard>
+            ) : (
+                <FreeSubscriptionPlanSelectorCard {...commonCardData}>
+                    {plansList}
+                </FreeSubscriptionPlanSelectorCard>
+            )}
+        </Stack>
     );
-}
+};
+
+/**
+ * Return the outcome that should happen when the user selects a paid plan on
+ * the plan selection screen.
+ *
+ * @param subscription Their current subscription details.
+ */
+const planSelectionOutcome = (subscription: Subscription | undefined) => {
+    // This shouldn't happen, but we need this case to handle missing types.
+    if (!subscription) return "buyPlan";
+
+    // The user is a on a free plan and can buy the plan they selected.
+    if (subscription.productID == "free") return "buyPlan";
+
+    // Their existing subscription has expired. They can buy a new plan.
+    if (subscription.expiryTime < Date.now() * 1000) return "buyPlan";
+
+    // -- The user already has an active subscription to a paid plan.
+
+    // Using Stripe.
+    if (subscription.paymentProvider == "stripe") {
+        // Update their existing subscription to the new plan.
+        return "updateSubscriptionToPlan";
+    }
+
+    // Using one of the mobile app stores.
+    if (
+        subscription.paymentProvider == "appstore" ||
+        subscription.paymentProvider == "playstore"
+    ) {
+        // They need to cancel first on the mobile app stores.
+        return "cancelOnMobile";
+    }
+
+    // Some other bespoke case. They should contact support.
+    return "contactSupport";
+};
 
 function FreeSubscriptionPlanSelectorCard({
     children,
     subscription,
-    bonusData,
+    addOnBonuses,
     closeModal,
     setLoading,
     planPeriod,
@@ -280,7 +300,7 @@ function FreeSubscriptionPlanSelectorCard({
     return (
         <>
             <Typography variant="h3" fontWeight={"bold"}>
-                {t("CHOOSE_PLAN")}
+                {t("choose_plan")}
             </Typography>
 
             <Box>
@@ -291,23 +311,20 @@ function FreeSubscriptionPlanSelectorCard({
                             togglePeriod={togglePeriod}
                         />
                         <Typography variant="small" mt={0.5} color="text.muted">
-                            {t("TWO_MONTHS_FREE")}
+                            {t("two_months_free")}
                         </Typography>
                     </Box>
                     {children}
-                    {hasAddOnBonus(bonusData) && (
-                        <BFAddOnRow
-                            bonusData={bonusData}
-                            closeModal={closeModal}
-                        />
-                    )}
-                    {hasAddOnBonus(bonusData) && (
-                        <ManageSubscription
-                            subscription={subscription}
-                            bonusData={bonusData}
-                            closeModal={closeModal}
-                            setLoading={setLoading}
-                        />
+                    {subscription && addOnBonuses.length > 0 && (
+                        <>
+                            <AddOnBonusRows addOnBonuses={addOnBonuses} />
+                            <ManageSubscription
+                                subscription={subscription}
+                                hasAddOnBonus={true}
+                                closeModal={closeModal}
+                                setLoading={setLoading}
+                            />
+                        </>
                     )}
                 </Stack>
             </Box>
@@ -318,7 +335,7 @@ function FreeSubscriptionPlanSelectorCard({
 function PaidSubscriptionPlanSelectorCard({
     children,
     subscription,
-    bonusData,
+    addOnBonuses,
     closeModal,
     usage,
     planPeriod,
@@ -331,7 +348,7 @@ function PaidSubscriptionPlanSelectorCard({
                 <SpaceBetweenFlex>
                     <Box>
                         <Typography variant="h3" fontWeight={"bold"}>
-                            {t("SUBSCRIPTION")}
+                            {t("subscription")}
                         </Typography>
                         <Typography variant="small" color={"text.muted"}>
                             {bytesInGB(subscription.storage, 2)}{" "}
@@ -347,7 +364,7 @@ function PaidSubscriptionPlanSelectorCard({
             <Box px={1.5}>
                 <Typography color={"text.muted"} fontWeight={"bold"}>
                     <Trans
-                        i18nKey="CURRENT_USAGE"
+                        i18nKey="current_usage"
                         values={{
                             usage: `${bytesInGB(usage, 2)} ${t("storage_unit.gb")}`,
                         }}
@@ -368,7 +385,7 @@ function PaidSubscriptionPlanSelectorCard({
                             togglePeriod={togglePeriod}
                         />
                         <Typography variant="small" mt={0.5} color="text.muted">
-                            {t("TWO_MONTHS_FREE")}
+                            {t("two_months_free")}
                         </Typography>
                     </Box>
                     {children}
@@ -384,18 +401,15 @@ function PaidSubscriptionPlanSelectorCard({
                                   date: subscription.expiryTime,
                               })}
                     </Typography>
-                    {hasAddOnBonus(bonusData) && (
-                        <BFAddOnRow
-                            bonusData={bonusData}
-                            closeModal={closeModal}
-                        />
+                    {addOnBonuses.length > 0 && (
+                        <AddOnBonusRows addOnBonuses={addOnBonuses} />
                     )}
                 </Box>
             </Box>
 
             <ManageSubscription
                 subscription={subscription}
-                bonusData={bonusData}
+                hasAddOnBonus={addOnBonuses.length > 0}
                 closeModal={closeModal}
                 setLoading={setLoading}
             />
@@ -404,10 +418,8 @@ function PaidSubscriptionPlanSelectorCard({
 }
 
 function PeriodToggler({ planPeriod, togglePeriod }) {
-    const handleChange = (_, newPlanPeriod: PLAN_PERIOD) => {
-        if (newPlanPeriod !== null && newPlanPeriod !== planPeriod) {
-            togglePeriod();
-        }
+    const handleChange = (_, newPlanPeriod: PlanPeriod) => {
+        if (newPlanPeriod !== planPeriod) togglePeriod();
     };
 
     return (
@@ -417,11 +429,11 @@ function PeriodToggler({ planPeriod, togglePeriod }) {
             onChange={handleChange}
             color="primary"
         >
-            <CustomToggleButton value={PLAN_PERIOD.MONTH}>
-                {t("MONTHLY")}
+            <CustomToggleButton value={"month"}>
+                {t("monthly")}
             </CustomToggleButton>
-            <CustomToggleButton value={PLAN_PERIOD.YEAR}>
-                {t("YEARLY")}
+            <CustomToggleButton value={"year"}>
+                {t("yearly")}
             </CustomToggleButton>
         </ToggleButtonGroup>
     );
@@ -446,30 +458,33 @@ const CustomToggleButton = styled(ToggleButton)(({ theme }) => ({
 }));
 
 interface PlansProps {
-    plansResponse: PlansResponse | undefined;
-    planPeriod: PLAN_PERIOD;
+    plansData: PlansData | undefined;
+    planPeriod: PlanPeriod;
     subscription: Subscription;
-    bonusData?: BonusData;
+    hasAddOnBonus: boolean;
     onPlanSelect: (plan: Plan) => void;
     closeModal: () => void;
 }
 
 const Plans = ({
-    plansResponse,
+    plansData,
     planPeriod,
     subscription,
-    bonusData,
+    hasAddOnBonus,
     onPlanSelect,
     closeModal,
 }: PlansProps) => {
-    const { freePlan, plans } = plansResponse ?? {};
+    const { freePlan, plans } = plansData ?? {};
     return (
         <Stack spacing={2}>
             {plans
                 ?.filter((plan) => plan.period === planPeriod)
                 ?.map((plan) => (
                     <PlanRow
-                        disabled={isUserSubscribedPlan(plan, subscription)}
+                        disabled={
+                            subscription &&
+                            isSubscriptionForPlan(subscription, plan)
+                        }
                         popular={isPopularPlan(plan)}
                         key={plan.stripeID}
                         plan={plan}
@@ -477,8 +492,8 @@ const Plans = ({
                         onPlanSelect={onPlanSelect}
                     />
                 ))}
-            {!hasPaidSubscription(subscription) &&
-                !hasAddOnBonus(bonusData) &&
+            {!(subscription && isSubscriptionActivePaid(subscription)) &&
+                !hasAddOnBonus &&
                 freePlan && (
                     <FreePlanRow
                         storage={freePlan.storage}
@@ -488,6 +503,9 @@ const Plans = ({
         </Stack>
     );
 };
+
+const isPopularPlan = (plan: Plan) =>
+    plan.storage === 100 * 1024 * 1024 * 1024; /* 100 GB */
 
 interface PlanRowProps {
     plan: Plan;
@@ -504,9 +522,7 @@ function PlanRow({
     disabled,
     popular,
 }: PlanRowProps) {
-    const handleClick = () => {
-        !isUserSubscribedPlan(plan, subscription) && onPlanSelect(plan);
-    };
+    const handleClick = () => !disabled && onPlanSelect(plan);
 
     const PlanButton = disabled ? DisabledPlanButton : ActivePlanButton;
 
@@ -520,9 +536,11 @@ function PlanRow({
                     <Typography variant="h3" color="text.muted">
                         {t("storage_unit.gb")}
                     </Typography>
-                    {popular && !hasPaidSubscription(subscription) && (
-                        <Badge>{t("POPULAR")}</Badge>
-                    )}
+                    {popular &&
+                        !(
+                            subscription &&
+                            isSubscriptionActivePaid(subscription)
+                        ) && <Badge>{t("POPULAR")}</Badge>}
                 </FlexWrapper>
             </TopAlignedFluidContainer>
             <Box width="136px">
@@ -541,9 +559,9 @@ function PlanRow({
                         </Typography>{" "}
                         <Typography color="text.muted" variant="small">
                             {`/ ${
-                                plan.period === PLAN_PERIOD.MONTH
-                                    ? t("MONTH_SHORT")
-                                    : t("YEAR")
+                                plan.period === "month"
+                                    ? t("month_short")
+                                    : t("year")
                             }`}
                         </Typography>
                     </Box>
@@ -624,149 +642,139 @@ const FreePlanRow_ = styled(SpaceBetweenFlex)(({ theme }) => ({
     },
 }));
 
-function BFAddOnRow({ bonusData, closeModal }) {
-    return (
-        <>
-            {bonusData.storageBonuses.map((bonus) => {
-                if (bonus.type.startsWith("ADD_ON")) {
-                    return (
-                        <AddOnRowContainer key={bonus.id} onClick={closeModal}>
-                            <Box>
-                                <Typography color="text.muted">
-                                    <Trans
-                                        i18nKey={"add_on_valid_till"}
-                                        values={{
-                                            storage: formattedStorageByteSize(
-                                                bonus.storage,
-                                            ),
-                                            date: bonus.validTill,
-                                        }}
-                                    />
-                                </Typography>
-                            </Box>
-                        </AddOnRowContainer>
-                    );
-                }
-                return null;
-            })}
-        </>
-    );
+interface AddOnBonusRowsProps {
+    addOnBonuses: Bonus[];
 }
 
-const AddOnRowContainer = styled(SpaceBetweenFlex)(({ theme }) => ({
-    // gap: theme.spacing(1.5),
-    padding: theme.spacing(1, 0),
-    cursor: "pointer",
-    "&:hover .endIcon": {
-        backgroundColor: "rgba(255,255,255,0.08)",
-    },
-}));
+const AddOnBonusRows: React.FC<AddOnBonusRowsProps> = ({ addOnBonuses }) => (
+    <>
+        {addOnBonuses.map((bonus, i) => (
+            <Typography color="text.muted" key={i} sx={{ pt: 1 }}>
+                <Trans
+                    i18nKey={"add_on_valid_till"}
+                    values={{
+                        storage: formattedStorageByteSize(bonus.storage),
+                        date: bonus.validTill,
+                    }}
+                />
+            </Typography>
+        ))}
+    </>
+);
 
 interface ManageSubscriptionProps {
     subscription: Subscription;
-    bonusData?: BonusData;
+    hasAddOnBonus: boolean;
     closeModal: () => void;
     setLoading: SetLoading;
 }
 
 function ManageSubscription({
     subscription,
-    bonusData,
+    hasAddOnBonus,
     closeModal,
     setLoading,
 }: ManageSubscriptionProps) {
-    const { setDialogMessage } = useContext(AppContext);
+    const { onGenericError } = useAppContext();
 
     const openFamilyPortal = async () => {
         setLoading(true);
         try {
             openURL(await getFamilyPortalRedirectURL());
         } catch (e) {
-            log.error("Could not redirect to family portal", e);
-            setDialogMessage({
-                title: t("error"),
-                content: t("generic_error_retry"),
-                close: { variant: "critical" },
-            });
+            onGenericError(e);
         }
         setLoading(false);
     };
 
     return (
         <Stack spacing={1}>
-            {hasStripeSubscription(subscription) && (
+            {isSubscriptionStripe(subscription) && (
                 <StripeSubscriptionOptions
+                    onClose={closeModal}
                     subscription={subscription}
-                    bonusData={bonusData}
-                    closeModal={closeModal}
-                    setLoading={setLoading}
+                    hasAddOnBonus={hasAddOnBonus}
                 />
             )}
             <ManageSubscriptionButton
                 color="secondary"
                 onClick={openFamilyPortal}
             >
-                {t("MANAGE_FAMILY_PORTAL")}
+                {t("manage_family")}
             </ManageSubscriptionButton>
         </Stack>
     );
 }
 
-function StripeSubscriptionOptions({
+interface StripeSubscriptionOptionsProps {
+    onClose: () => void;
+    subscription: Subscription;
+    hasAddOnBonus: boolean;
+}
+
+const StripeSubscriptionOptions: React.FC<StripeSubscriptionOptionsProps> = ({
+    onClose,
     subscription,
-    bonusData,
-    setLoading,
-    closeModal,
-}: ManageSubscriptionProps) {
-    const appContext = useContext(AppContext);
+    hasAddOnBonus,
+}) => {
+    const { showMiniDialog } = useAppContext();
 
     const confirmReactivation = () =>
-        appContext.setDialogMessage({
-            title: t("REACTIVATE_SUBSCRIPTION"),
-            content: t("REACTIVATE_SUBSCRIPTION_MESSAGE", {
+        showMiniDialog({
+            title: t("reactivate_subscription"),
+            message: t("reactivate_subscription_message", {
                 date: subscription.expiryTime,
             }),
-            proceed: {
-                text: t("REACTIVATE_SUBSCRIPTION"),
-                action: activateSubscription.bind(
-                    null,
-                    appContext.setDialogMessage,
-                    closeModal,
-                    setLoading,
-                ),
-                variant: "accent",
-            },
-            close: {
-                text: t("cancel"),
+            continue: {
+                text: t("reactivate_subscription"),
+                action: async () => {
+                    await activateStripeSubscription();
+                    onClose();
+                    // [Note: Chained MiniDialogs]
+                    //
+                    // The MiniDialog will automatically close when we the
+                    // action promise resolves, so if we want to show another
+                    // dialog, schedule it on the next run loop.
+                    setTimeout(() => {
+                        showMiniDialog({
+                            title: t("success"),
+                            message: t("subscription_activate_success"),
+                            continue: { action: onClose },
+                            cancel: false,
+                        });
+                    }, 0);
+                },
             },
         });
+
     const confirmCancel = () =>
-        appContext.setDialogMessage({
-            title: t("CANCEL_SUBSCRIPTION"),
-            content: hasAddOnBonus(bonusData) ? (
-                <Trans i18nKey={"CANCEL_SUBSCRIPTION_WITH_ADDON_MESSAGE"} />
+        showMiniDialog({
+            title: t("cancel_subscription"),
+            message: hasAddOnBonus ? (
+                <Trans i18nKey={"cancel_subscription_with_addon_message"} />
             ) : (
-                <Trans i18nKey={"CANCEL_SUBSCRIPTION_MESSAGE"} />
+                <Trans i18nKey={"cancel_subscription_message"} />
             ),
-            proceed: {
-                text: t("CANCEL_SUBSCRIPTION"),
-                action: cancelSubscription.bind(
-                    null,
-                    appContext.setDialogMessage,
-                    closeModal,
-                    setLoading,
-                ),
-                variant: "critical",
+            continue: {
+                text: t("cancel_subscription"),
+                color: "critical",
+                action: async () => {
+                    await cancelStripeSubscription();
+                    onClose();
+                    // See: [Note: Chained MiniDialogs]
+                    setTimeout(() => {
+                        showMiniDialog({
+                            message: t("subscription_cancel_success"),
+                            cancel: t("ok"),
+                        });
+                    }, 0);
+                },
             },
-            close: {
-                text: t("NEVERMIND"),
-            },
+            cancel: t("nevermind"),
         });
-    const openManagementPortal = updatePaymentMethod.bind(
-        null,
-        appContext.setDialogMessage,
-        setLoading,
-    );
+
+    const handleManageClick = useWrapAsyncOperation(redirectToCustomerPortal);
+
     return (
         <>
             {isSubscriptionCancelled(subscription) ? (
@@ -774,32 +782,28 @@ function StripeSubscriptionOptions({
                     color="secondary"
                     onClick={confirmReactivation}
                 >
-                    {t("REACTIVATE_SUBSCRIPTION")}
+                    {t("reactivate_subscription")}
                 </ManageSubscriptionButton>
             ) : (
                 <ManageSubscriptionButton
                     color="secondary"
                     onClick={confirmCancel}
                 >
-                    {t("CANCEL_SUBSCRIPTION")}
+                    {t("cancel_subscription")}
                 </ManageSubscriptionButton>
             )}
             <ManageSubscriptionButton
                 color="secondary"
-                onClick={openManagementPortal}
+                onClick={handleManageClick}
             >
-                {t("MANAGEMENT_PORTAL")}
+                {t("manage_payment_method")}
             </ManageSubscriptionButton>
         </>
     );
-}
+};
 
 const ManageSubscriptionButton = ({ children, ...props }: ButtonProps) => (
     <Button size="large" endIcon={<ChevronRight />} {...props}>
         <FluidContainer>{children}</FluidContainer>
     </Button>
 );
-
-function getLocalUserDetails(): UserDetails {
-    return getData(LS_KEYS.USER_DETAILS)?.value;
-}
