@@ -8849,6 +8849,17 @@ class S {
     );
   }
 
+  /// `Find them quickly`
+  String get findThemQuickly {
+    return Intl.message(
+      'Find them quickly',
+      name: 'findThemQuickly',
+      desc:
+          'Subtitle to indicate that the user can find people quickly by name',
+      args: [],
+    );
+  }
+
   /// `Find people quickly by name`
   String get findPeopleByName {
     return Intl.message(
@@ -8990,6 +9001,76 @@ class S {
     return Intl.message(
       'Enter person name',
       name: 'enterPersonName',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Enter name`
+  String get enterName {
+    return Intl.message(
+      'Enter name',
+      name: 'enterName',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Save person`
+  String get savePerson {
+    return Intl.message(
+      'Save person',
+      name: 'savePerson',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Edit person`
+  String get editPerson {
+    return Intl.message(
+      'Edit person',
+      name: 'editPerson',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Merged photos`
+  String get mergedPhotos {
+    return Intl.message(
+      'Merged photos',
+      name: 'mergedPhotos',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Or merge with existing`
+  String get orMergeWithExistingPerson {
+    return Intl.message(
+      'Or merge with existing',
+      name: 'orMergeWithExistingPerson',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Birthday (optional)`
+  String get enterDateOfBirth {
+    return Intl.message(
+      'Birthday (optional)',
+      name: 'enterDateOfBirth',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Birthday`
+  String get birthday {
+    return Intl.message(
+      'Birthday',
+      name: 'birthday',
       desc: '',
       args: [],
     );
@@ -9250,6 +9331,16 @@ class S {
     return Intl.message(
       'Review suggestions',
       name: 'reviewSuggestions',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Review`
+  String get review {
+    return Intl.message(
+      'Review',
+      name: 'review',
       desc: '',
       args: [],
     );
@@ -9816,13 +9907,13 @@ class S {
     );
   }
 
-  /// `Extra photos found for $text`
-  String get extraPhotosFoundFor {
+  /// `Extra photos found for {text}`
+  String extraPhotosFoundFor(String text) {
     return Intl.message(
-      'Extra photos found for \$text',
+      'Extra photos found for $text',
       name: 'extraPhotosFoundFor',
       desc: '',
-      args: [],
+      args: [text],
     );
   }
 
@@ -9856,10 +9947,10 @@ class S {
     );
   }
 
-  /// `Reset person`
+  /// `Remove`
   String get resetPerson {
     return Intl.message(
-      'Reset person',
+      'Remove',
       name: 'resetPerson',
       desc: '',
       args: [],
@@ -9969,6 +10060,158 @@ class S {
       name: 'collaboratorsSuccessfullyAdded',
       desc: 'Number of collaborators that were successfully added to an album.',
       args: [count],
+    );
+  }
+
+  /// `Account is already configured.`
+  String get accountIsAlreadyConfigured {
+    return Intl.message(
+      'Account is already configured.',
+      name: 'accountIsAlreadyConfigured',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Session ID mismatch`
+  String get sessionIdMismatch {
+    return Intl.message(
+      'Session ID mismatch',
+      name: 'sessionIdMismatch',
+      desc:
+          'In passkey page, deeplink is ignored because of session ID mismatch.',
+      args: [],
+    );
+  }
+
+  /// `Failed to fetch active sessions`
+  String get failedToFetchActiveSessions {
+    return Intl.message(
+      'Failed to fetch active sessions',
+      name: 'failedToFetchActiveSessions',
+      desc:
+          'In session page, warn user (in toast) that active sessions could not be fetched.',
+      args: [],
+    );
+  }
+
+  /// `Failed to refresh subscription`
+  String get failedToRefreshStripeSubscription {
+    return Intl.message(
+      'Failed to refresh subscription',
+      name: 'failedToRefreshStripeSubscription',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Failed to play video`
+  String get failedToPlayVideo {
+    return Intl.message(
+      'Failed to play video',
+      name: 'failedToPlayVideo',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Upload is ignored due to {ignoreReason}`
+  String uploadIsIgnoredDueToIgnorereason(String ignoreReason) {
+    return Intl.message(
+      'Upload is ignored due to $ignoreReason',
+      name: 'uploadIsIgnoredDueToIgnorereason',
+      desc: '',
+      args: [ignoreReason],
+    );
+  }
+
+  /// `Type of gallery {galleryType} is not supported for rename`
+  String typeOfGallerGallerytypeIsNotSupportedForRename(String galleryType) {
+    return Intl.message(
+      'Type of gallery $galleryType is not supported for rename',
+      name: 'typeOfGallerGallerytypeIsNotSupportedForRename',
+      desc: '',
+      args: [galleryType],
+    );
+  }
+
+  /// `Tap to upload, upload is currently ignored due to {ignoreReason}`
+  String tapToUploadIsIgnoredDue(String ignoreReason) {
+    return Intl.message(
+      'Tap to upload, upload is currently ignored due to $ignoreReason',
+      name: 'tapToUploadIsIgnoredDue',
+      desc: 'Shown in upload icon widet, inside a tooltip.',
+      args: [ignoreReason],
+    );
+  }
+
+  /// `Tap to upload`
+  String get tapToUpload {
+    return Intl.message(
+      'Tap to upload',
+      name: 'tapToUpload',
+      desc: 'Shown in upload icon widet, inside a tooltip.',
+      args: [],
+    );
+  }
+
+  /// `Info`
+  String get info {
+    return Intl.message(
+      'Info',
+      name: 'info',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Add Files`
+  String get addFiles {
+    return Intl.message(
+      'Add Files',
+      name: 'addFiles',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Cast album`
+  String get castAlbum {
+    return Intl.message(
+      'Cast album',
+      name: 'castAlbum',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Image not analyzed`
+  String get imageNotAnalyzed {
+    return Intl.message(
+      'Image not analyzed',
+      name: 'imageNotAnalyzed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `No faces found`
+  String get noFacesFound {
+    return Intl.message(
+      'No faces found',
+      name: 'noFacesFound',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `File not uploaded yet`
+  String get fileNotUploadedYet {
+    return Intl.message(
+      'File not uploaded yet',
+      name: 'fileNotUploadedYet',
+      desc: '',
+      args: [],
     );
   }
 }
