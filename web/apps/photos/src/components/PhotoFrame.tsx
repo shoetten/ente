@@ -362,7 +362,9 @@ const PhotoFrame = ({
                 }
                 log.info(`[${item.id}] doesn't have thumbnail`);
                 thumbFetching[item.id] = true;
-                const url = await DownloadManager.getThumbnailForPreview(item);
+                // URL will always be defined (unless an error is thrown) since
+                // we are not passing the `cachedOnly` option.
+                const url = await DownloadManager.renderableThumbnailURL(item)!;
                 updateThumb(instance, index, item, url, false);
             } catch (e) {
                 log.error("getSlideData failed get msrc url failed", e);
@@ -394,8 +396,6 @@ const PhotoFrame = ({
 
                 const dummyImgSrcUrl: SourceURLs = {
                     url: imageURL,
-                    isOriginal: false,
-                    isRenderable: !!imageURL,
                     type: "normal",
                 };
                 try {
@@ -422,8 +422,6 @@ const PhotoFrame = ({
                 const videoURL = await srcImgURL.video();
                 const loadedLivePhotoSrcURL: SourceURLs = {
                     url: { video: videoURL, image: imageURL },
-                    isOriginal: false,
-                    isRenderable: !!videoURL,
                     type: "livePhoto",
                 };
                 try {
@@ -605,7 +603,8 @@ async function updateFileSrcProps(
     srcURLs: SourceURLs,
     enableDownload: boolean,
 ) {
-    const { url, isRenderable } = srcURLs;
+    const { url } = srcURLs;
+    const isRenderable = !!url;
     file.w = window.innerWidth;
     file.h = window.innerHeight;
     file.isSourceLoaded =
