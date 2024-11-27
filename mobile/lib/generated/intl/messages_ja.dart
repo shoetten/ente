@@ -207,10 +207,10 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m2(email) => "<green>${email}</green>にメールを送りました";
 
-  static String m79(count) =>
+  static String m81(count) =>
       "${Intl.plural(count, one: '${count} 年前', other: '${count} 年前')}";
 
-  static String m80(storageSaved) => "${storageSaved} を解放しました";
+  static String m82(storageSaved) => "${storageSaved} を解放しました";
 
   final messages = _notInlinedMessages(_notInlinedMessages);
   static Map<String, Function> _notInlinedMessages(_) => <String, Function>{
@@ -268,9 +268,12 @@ class MessageLookup extends MessageLookupByLibrary {
         "allClear": MessageLookupByLibrary.simpleMessage("✨ オールクリア"),
         "allMemoriesPreserved":
             MessageLookupByLibrary.simpleMessage("すべての思い出が保存されました"),
+        "allow": MessageLookupByLibrary.simpleMessage("Allow"),
         "allowAddPhotosDescription": MessageLookupByLibrary.simpleMessage(
             "リンクを持つ人が共有アルバムに写真を追加できるようにします。"),
         "allowAddingPhotos": MessageLookupByLibrary.simpleMessage("写真の追加を許可"),
+        "allowAppToOpenSharedAlbumLinks": MessageLookupByLibrary.simpleMessage(
+            "Allow app to open shared album links"),
         "allowDownloads": MessageLookupByLibrary.simpleMessage("ダウンロードを許可"),
         "allowPeopleToAddPhotos":
             MessageLookupByLibrary.simpleMessage("写真の追加をメンバーに許可する"),
@@ -366,6 +369,7 @@ class MessageLookup extends MessageLookupByLibrary {
             MessageLookupByLibrary.simpleMessage("バックアップされたフォルダ"),
         "backup": MessageLookupByLibrary.simpleMessage("バックアップ"),
         "backupFailed": MessageLookupByLibrary.simpleMessage("バックアップ失敗"),
+        "backupFile": MessageLookupByLibrary.simpleMessage("Backup file"),
         "backupOverMobileData":
             MessageLookupByLibrary.simpleMessage("モバイルデータを使ってバックアップ"),
         "backupSettings": MessageLookupByLibrary.simpleMessage("バックアップ設定"),
@@ -1011,6 +1015,11 @@ class MessageLookup extends MessageLookupByLibrary {
             MessageLookupByLibrary.simpleMessage("編集を保存できませんでした"),
         "oopsSomethingWentWrong":
             MessageLookupByLibrary.simpleMessage("問題が発生しました"),
+        "openAlbumInBrowser":
+            MessageLookupByLibrary.simpleMessage("Open album in browser"),
+        "openAlbumInBrowserTitle": MessageLookupByLibrary.simpleMessage(
+            "Please use the web app to add photos to this album"),
+        "openFile": MessageLookupByLibrary.simpleMessage("Open file"),
         "openSettings": MessageLookupByLibrary.simpleMessage("設定を開く"),
         "openTheItem": MessageLookupByLibrary.simpleMessage("• アイテムを開く"),
         "openstreetmapContributors":
@@ -1241,6 +1250,8 @@ class MessageLookup extends MessageLookupByLibrary {
             MessageLookupByLibrary.simpleMessage("友達を招待すると、共有される写真はここから閲覧できます"),
         "searchResultCount": m55,
         "security": MessageLookupByLibrary.simpleMessage("セキュリティ"),
+        "seePublicAlbumLinksInApp": MessageLookupByLibrary.simpleMessage(
+            "See public album links in app"),
         "selectALocation": MessageLookupByLibrary.simpleMessage("場所を選択"),
         "selectALocationFirst":
             MessageLookupByLibrary.simpleMessage("先に場所を選択してください"),
@@ -1398,6 +1409,9 @@ class MessageLookup extends MessageLookupByLibrary {
             MessageLookupByLibrary.simpleMessage("ありがとうございます！"),
         "theDownloadCouldNotBeCompleted":
             MessageLookupByLibrary.simpleMessage("ダウンロードを完了できませんでした"),
+        "theLinkYouAreTryingToAccessHasExpired":
+            MessageLookupByLibrary.simpleMessage(
+                "The link you are trying to access has expired."),
         "theRecoveryKeyYouEnteredIsIncorrect":
             MessageLookupByLibrary.simpleMessage("入力したリカバリーキーが間違っています"),
         "theme": MessageLookupByLibrary.simpleMessage("テーマ"),
@@ -1536,7 +1550,7 @@ class MessageLookup extends MessageLookupByLibrary {
         "welcomeBack": MessageLookupByLibrary.simpleMessage("おかえりなさい！"),
         "whatsNew": MessageLookupByLibrary.simpleMessage("最新情報"),
         "yearly": MessageLookupByLibrary.simpleMessage("年額"),
-        "yearsAgo": m79,
+        "yearsAgo": m81,
         "yes": MessageLookupByLibrary.simpleMessage("はい"),
         "yesCancel": MessageLookupByLibrary.simpleMessage("キャンセル"),
         "yesConvertToViewer":
@@ -1564,7 +1578,7 @@ class MessageLookup extends MessageLookupByLibrary {
             MessageLookupByLibrary.simpleMessage("自分自身と共有することはできません"),
         "youDontHaveAnyArchivedItems":
             MessageLookupByLibrary.simpleMessage("アーカイブした項目はありません"),
-        "youHaveSuccessfullyFreedUp": m80,
+        "youHaveSuccessfullyFreedUp": m82,
         "yourAccountHasBeenDeleted":
             MessageLookupByLibrary.simpleMessage("アカウントは削除されました"),
         "yourMap": MessageLookupByLibrary.simpleMessage("あなたの地図"),

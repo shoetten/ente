@@ -244,10 +244,10 @@ class MessageLookup extends MessageLookupByLibrary {
   static String m2(email) =>
       "Nous avons envoyé un e-mail à <green>${email}</green>";
 
-  static String m79(count) =>
+  static String m81(count) =>
       "${Intl.plural(count, one: 'il y a ${count} an', other: 'il y a ${count} ans')}";
 
-  static String m80(storageSaved) =>
+  static String m82(storageSaved) =>
       "Vous avez libéré ${storageSaved} avec succès !";
 
   final messages = _notInlinedMessages(_notInlinedMessages);
@@ -327,10 +327,13 @@ class MessageLookup extends MessageLookupByLibrary {
             "Tous les souvenirs conservés"),
         "allPersonGroupingWillReset": MessageLookupByLibrary.simpleMessage(
             "Tous les groupements pour cette personne seront réinitialisés, et vous perdrez toutes les suggestions faites pour cette personne"),
+        "allow": MessageLookupByLibrary.simpleMessage("Allow"),
         "allowAddPhotosDescription": MessageLookupByLibrary.simpleMessage(
             "Autoriser les personnes avec le lien à ajouter des photos à l\'album partagé."),
         "allowAddingPhotos": MessageLookupByLibrary.simpleMessage(
             "Autoriser l\'ajout de photos"),
+        "allowAppToOpenSharedAlbumLinks": MessageLookupByLibrary.simpleMessage(
+            "Allow app to open shared album links"),
         "allowDownloads": MessageLookupByLibrary.simpleMessage(
             "Autoriser les téléchargements"),
         "allowPeopleToAddPhotos": MessageLookupByLibrary.simpleMessage(
@@ -447,6 +450,7 @@ class MessageLookup extends MessageLookupByLibrary {
         "backup": MessageLookupByLibrary.simpleMessage("Sauvegarde"),
         "backupFailed":
             MessageLookupByLibrary.simpleMessage("Échec de la sauvegarde"),
+        "backupFile": MessageLookupByLibrary.simpleMessage("Backup file"),
         "backupOverMobileData": MessageLookupByLibrary.simpleMessage(
             "Sauvegarde sur données mobiles"),
         "backupSettings":
@@ -1272,6 +1276,11 @@ class MessageLookup extends MessageLookupByLibrary {
             "Oups, impossible d\'enregistrer les modifications"),
         "oopsSomethingWentWrong": MessageLookupByLibrary.simpleMessage(
             "Oups, une erreur est arrivée"),
+        "openAlbumInBrowser":
+            MessageLookupByLibrary.simpleMessage("Open album in browser"),
+        "openAlbumInBrowserTitle": MessageLookupByLibrary.simpleMessage(
+            "Please use the web app to add photos to this album"),
+        "openFile": MessageLookupByLibrary.simpleMessage("Open file"),
         "openSettings":
             MessageLookupByLibrary.simpleMessage("Ouvrir les paramètres"),
         "openTheItem":
@@ -1568,6 +1577,8 @@ class MessageLookup extends MessageLookupByLibrary {
         "searchResultCount": m55,
         "searchSectionsLengthMismatch": m56,
         "security": MessageLookupByLibrary.simpleMessage("Sécurité"),
+        "seePublicAlbumLinksInApp": MessageLookupByLibrary.simpleMessage(
+            "See public album links in app"),
         "selectALocation":
             MessageLookupByLibrary.simpleMessage("Sélectionnez un emplacement"),
         "selectALocationFirst": MessageLookupByLibrary.simpleMessage(
@@ -1773,6 +1784,9 @@ class MessageLookup extends MessageLookupByLibrary {
             MessageLookupByLibrary.simpleMessage("Merci de vous être abonné !"),
         "theDownloadCouldNotBeCompleted": MessageLookupByLibrary.simpleMessage(
             "Le téléchargement n\'a pas pu être terminé"),
+        "theLinkYouAreTryingToAccessHasExpired":
+            MessageLookupByLibrary.simpleMessage(
+                "The link you are trying to access has expired."),
         "theRecoveryKeyYouEnteredIsIncorrect":
             MessageLookupByLibrary.simpleMessage(
                 "La clé de récupération que vous avez entrée est incorrecte"),
@@ -1944,7 +1958,7 @@ class MessageLookup extends MessageLookupByLibrary {
         "whatsNew": MessageLookupByLibrary.simpleMessage("Nouveautés"),
         "yearShort": MessageLookupByLibrary.simpleMessage("an"),
         "yearly": MessageLookupByLibrary.simpleMessage("Annuel"),
-        "yearsAgo": m79,
+        "yearsAgo": m81,
         "yes": MessageLookupByLibrary.simpleMessage("Oui"),
         "yesCancel": MessageLookupByLibrary.simpleMessage("Oui, annuler"),
         "yesConvertToViewer": MessageLookupByLibrary.simpleMessage(
@@ -1977,7 +1991,7 @@ class MessageLookup extends MessageLookupByLibrary {
             "Vous ne pouvez pas partager avec vous-même"),
         "youDontHaveAnyArchivedItems": MessageLookupByLibrary.simpleMessage(
             "Vous n\'avez aucun élément archivé."),
-        "youHaveSuccessfullyFreedUp": m80,
+        "youHaveSuccessfullyFreedUp": m82,
         "yourAccountHasBeenDeleted":
             MessageLookupByLibrary.simpleMessage("Votre compte a été supprimé"),
         "yourMap": MessageLookupByLibrary.simpleMessage("Votre carte"),
