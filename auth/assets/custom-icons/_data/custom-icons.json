@@ -81,17 +81,6 @@
       ]
     },
     {
-      "title": "Binance TR",
-      "slug": "binance_tr"
-    },
-    {
-      "title": "BinanceUS",
-      "slug": "binance_us",
-      "altNames": [
-        "Binance US"
-      ]
-    },
-    {
       "title": "Bitfinex"
     },
     {
@@ -124,13 +113,6 @@
       "title": "Bitwarden"
     },
     {
-      "title": "Bloom Host",
-      "slug": "bloom_host",
-      "altNames": [
-        "Bloom Host Billing"
-      ]
-    },
-    {
       "title": "Blockchain",
       "altNames": [
         "blockchain.com",
@@ -161,12 +143,6 @@
       ]
     },
     {
-      "title": "Booking",
-      "altNames": [
-        "Booking.com"
-      ]
-    },
-    {
       "title": "Brave Creators",
       "slug": "brave_creators",
       "altNames": [
@@ -174,6 +150,9 @@
         "Brave Rewards",
         "Brave Browser"
       ]
+    },
+    {
+      "title": "Bugzilla"
     },
     {
       "title": "Bybit"
@@ -269,6 +248,9 @@
       "title": "Doppler"
     },
     {
+      "title": "Dropbox"
+    },
+    {
       "title": "dus.net",
       "slug": "dusnet"
     },
@@ -302,6 +284,13 @@
     },
     {
       "title": "Estateguru"
+    },
+    {
+      "title": "Fidelity",
+      "slug": "fidelity",
+      "altNames": [
+        "Fidelity Investments"
+      ]
     },
     {
       "title": "Filen"
@@ -683,6 +672,10 @@
     },
     {
       "title": "Proxmox"
+    },
+    {
+      "title": "Pushover",
+      "slug": "pushover"
     },
     {
       "title": "qiniuyun",
