@@ -328,6 +328,9 @@
       }
     }
   },
+  "manualSort": "Custom",
+  "mostFrequentlyUsed": "Frequently used",
+  "mostRecentlyUsed": "Recently used",
   "activeSessions": "Active sessions",
   "somethingWentWrongPleaseTryAgain": "Something went wrong, please try again",
   "thisWillLogYouOutOfThisDevice": "This will log you out of this device!",
@@ -447,8 +450,10 @@
   "customEndpoint": "Connected to {endpoint}",
   "pinText": "Pin",
   "unpinText": "Unpin",
-  "pinnedCodeMessage": "{code} has been pinned",
-  "unpinnedCodeMessage": "{code} has been unpinned",
+  "fav": "Favorite",
+  "unfav": "Unfavorite",
+  "favoritedCodeMessage": "{code} has been added to favorites",
+  "unfavoritedCodeMessage": "{code} has been removed from favorites",
   "tags": "Tags",
   "createNewTag": "Create New Tag",
   "tag": "Tag",
