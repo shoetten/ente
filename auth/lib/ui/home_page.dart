@@ -183,7 +183,7 @@ class _HomePageState extends State<HomePage> {
             selectedTag != "" &&
                 !codeState.display.tags.contains(selectedTag) ||
             (codeState.isTrashed != _isTrashOpen) ||
-            (codeState.isPinned != _isFavouriteOpen)) {
+            (codeState.isPinned != _isFavouriteOpen && val.isEmpty)) {
           continue;
         }
 
@@ -262,6 +262,17 @@ class _HomePageState extends State<HomePage> {
       default:
         codes.sort((a, b) => a.display.position.compareTo(b.display.position));
         break;
+    }
+    if (sortKey != CodeSortKey.manual) {
+      // move pinned codes to the using
+      int insertIndex = 0;
+      for (int i = 0; i < codes.length; i++) {
+        if (codes[i].isPinned) {
+          final code = codes.removeAt(i);
+          codes.insert(insertIndex, code);
+          insertIndex++;
+        }
+      }
     }
   }
 
@@ -391,14 +402,13 @@ class _HomePageState extends State<HomePage> {
           actions: <Widget>[
             SortCodeMenuWidget(
               currentKey: PreferenceService.instance.codeSortKey(),
-              onSelected: (p0) async {
-                await PreferenceService.instance.setCodeSortKey(p0);
-
-                if (p0 == CodeSortKey.manual) {
+              onSelected: (newOrder) async {
+                await PreferenceService.instance.setCodeSortKey(newOrder);
+                if (newOrder == CodeSortKey.manual && newOrder == _codeSortKey) {
                   await navigateToReorderPage(_allCodes!);
                 }
                 setState(() {
-                  _codeSortKey = p0;
+                  _codeSortKey = newOrder;
                 });
                 if (mounted) {
                   _applyFilteringAndRefresh();
@@ -500,7 +510,7 @@ class _HomePageState extends State<HomePage> {
                     }
                     if (index == 1 && hasFavouriteCodes) {
                       return TagChip(
-                        label: "",
+                        label: context.l10n.favorites,
                         state: _isFavouriteOpen
                             ? TagChipState.selected
                             : TagChipState.unselected,
@@ -511,7 +521,7 @@ class _HomePageState extends State<HomePage> {
                           setState(() {});
                           _applyFilteringAndRefresh();
                         },
-                        iconData: Icons.star,
+                        // iconData: Icons.star,
                       );
                     }
                     if (index == itemCount - 1 && hasTrashedCodes) {
