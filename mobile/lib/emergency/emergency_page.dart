@@ -1,5 +1,6 @@
 import "dart:async";
 
+import "package:flutter/foundation.dart";
 import 'package:flutter/material.dart';
 import "package:flutter_svg/flutter_svg.dart";
 import 'package:photos/core/configuration.dart';
@@ -9,7 +10,6 @@ import "package:photos/emergency/other_contact_page.dart";
 import "package:photos/emergency/select_contact_page.dart";
 import "package:photos/generated/l10n.dart";
 import "package:photos/l10n/l10n.dart";
-import "package:photos/service_locator.dart";
 import "package:photos/theme/colors.dart";
 import 'package:photos/theme/ente_theme.dart';
 import "package:photos/ui/common/loading_widget.dart";
@@ -211,8 +211,8 @@ class _EmergencyPageState extends State<EmergencyPage> {
                               child: SvgPicture.asset(
                                 getEnteColorScheme(context).backdropBase ==
                                         backgroundBaseDark
-                                    ? "assets/icons/legacy-dark.svg"
-                                    : "assets/icons/legacy-light.svg",
+                                    ? "assets/icons/legacy-light.svg"
+                                    : "assets/icons/legacy-dark.svg",
                                 width: 156,
                                 height: 152,
                               ),
@@ -221,7 +221,7 @@ class _EmergencyPageState extends State<EmergencyPage> {
                               context.l10n.legacyPageDesc2,
                               style: getEnteTextTheme(context).smallMuted,
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 16),
                             ButtonWidget(
                               buttonType: ButtonType.primary,
                               labelText: S.of(context).addTrustedContact,
@@ -229,6 +229,7 @@ class _EmergencyPageState extends State<EmergencyPage> {
                                 await routeToPage(
                                   context,
                                   AddContactPage(info!),
+                                  forceCustomPageRoute: true,
                                 );
                                 unawaited(_fetchData());
                               },
@@ -250,6 +251,7 @@ class _EmergencyPageState extends State<EmergencyPage> {
                           await routeToPage(
                             context,
                             AddContactPage(info!),
+                            forceCustomPageRoute: true,
                           );
                           unawaited(_fetchData());
                         },
@@ -521,9 +523,9 @@ class _EmergencyPageState extends State<EmergencyPage> {
           },
           isInAlert: true,
         ),
-        if (flagService.internalUser)
+        if (kDebugMode)
           ButtonWidget(
-            labelText: "Approve recovery (internal)",
+            labelText: "Approve recovery (to be removed)",
             buttonType: ButtonType.primary,
             buttonSize: ButtonSize.large,
             buttonAction: ButtonAction.second,
@@ -546,7 +548,7 @@ class _EmergencyPageState extends State<EmergencyPage> {
           isInAlert: true,
         ),
       ],
-      body: "$emergencyContactEmail is trying to recover your accountx.",
+      body: context.l10n.recoveryWarningBody(emergencyContactEmail),
       actionSheetType: ActionSheetType.defaultActionSheet,
     );
     return;
