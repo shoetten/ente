@@ -270,6 +270,10 @@
       "title": "Dropbox"
     },
     {
+      "title": "DreamHost Panel",
+      "slug": "dreamhost_panel"
+    },
+    {
       "title": "dus.net",
       "slug": "dusnet"
     },
@@ -617,6 +621,9 @@
       "hex": "858585"
     },
     {
+      "title": "Nelnet"
+    },
+    {
       "title": "nintendo",
       "altNames": [
         "任天堂"
@@ -735,7 +742,8 @@
       ]
     },
     {
-      "title": "randstad"
+      "title": "randstad",
+      "hex": "#2175D9"
     },
     {
       "title": "Real-Debrid",
@@ -966,6 +974,10 @@
     },
     {
       "title": "Upstox"
+    },
+    {
+      "title": "US Mobile",
+      "slug": "us_mobile"
     },
     {
       "title": "Vikunja"
