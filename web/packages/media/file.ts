@@ -1,3 +1,5 @@
+import { sharedCryptoWorker } from "@/base/crypto";
+import log from "@/base/log";
 import { type Metadata, ItemVisibility } from "./file-metadata";
 
 // TODO: Audit this file.
@@ -113,9 +115,21 @@ export interface EncryptedEnteFile {
      * See: [Note: Metadatum].
      */
     pubMagicMetadata: EncryptedMagicMetadata;
-    /* always present */
+    /**
+     * The file's encryption key (as a base64 string), encrypted by the key of
+     * the collection to which it belongs.
+     *
+     * (note: This is always present. retaining this note until we remove
+     * nullability uncertainity from the types).
+     */
     encryptedKey: string;
-    /* always present */
+    /**
+     * The nonce (as a base64 string) that was used when encrypting the file's
+     * encryption key.
+     *
+     * (note: This is always present. retaining this note until we remove
+     * nullability uncertainity from the types).
+     */
     keyDecryptionNonce: string;
     isDeleted: boolean;
     updationTime: number;
@@ -161,21 +175,13 @@ export interface EnteFile
     isTrashed?: boolean;
     deleteBy?: number;
     /**
-     * The base64 encoded encryption key associated with this file.
+     * The base64 representation of the decrypted encryption key associated with
+     * this file.
      *
      * This key is used to encrypt both the file's contents, and any associated
      * data (e.g., metadatum, thumbnail) for the file.
      */
     key: string;
-}
-
-export interface TrashRequest {
-    items: TrashRequestItems[];
-}
-
-export interface TrashRequestItems {
-    fileID: number;
-    collectionID: number;
 }
 
 export interface FileWithUpdatedMagicMetadata {
@@ -278,6 +284,76 @@ export const fileLogID = (file: EnteFile) =>
     // TODO: Remove this when file/metadata types have optionality annotations.
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     `file ${file.metadata.title ?? "-"} (${file.id})`;
+
+export async function decryptFile(
+    file: EncryptedEnteFile,
+    collectionKey: string,
+): Promise<EnteFile> {
+    try {
+        const worker = await sharedCryptoWorker();
+        const {
+            encryptedKey,
+            keyDecryptionNonce,
+            metadata,
+            magicMetadata,
+            pubMagicMetadata,
+            ...restFileProps
+        } = file;
+        const fileKey = await worker.decryptB64(
+            encryptedKey,
+            keyDecryptionNonce,
+            collectionKey,
+        );
+        const fileMetadata = await worker.decryptMetadataJSON({
+            encryptedDataB64: metadata.encryptedData,
+            decryptionHeaderB64: metadata.decryptionHeader,
+            keyB64: fileKey,
+        });
+        let fileMagicMetadata: FileMagicMetadata;
+        let filePubMagicMetadata: FilePublicMagicMetadata;
+        /* eslint-disable @typescript-eslint/no-unnecessary-condition */
+        if (magicMetadata?.data) {
+            fileMagicMetadata = {
+                ...file.magicMetadata,
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-ignore
+                data: await worker.decryptMetadataJSON({
+                    encryptedDataB64: magicMetadata.data,
+                    decryptionHeaderB64: magicMetadata.header,
+                    keyB64: fileKey,
+                }),
+            };
+        }
+        /* eslint-disable @typescript-eslint/no-unnecessary-condition */
+        if (pubMagicMetadata?.data) {
+            filePubMagicMetadata = {
+                ...pubMagicMetadata,
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-ignore
+                data: await worker.decryptMetadataJSON({
+                    encryptedDataB64: pubMagicMetadata.data,
+                    decryptionHeaderB64: pubMagicMetadata.header,
+                    keyB64: fileKey,
+                }),
+            };
+        }
+        return {
+            ...restFileProps,
+            key: fileKey,
+            // @ts-expect-error TODO: Need to use zod here.
+            metadata: fileMetadata,
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-ignore
+            magicMetadata: fileMagicMetadata,
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-ignore
+            pubMagicMetadata: filePubMagicMetadata,
+        };
+    } catch (e) {
+        log.error("file decryption failed", e);
+        throw e;
+    }
+}
 
 /**
  * Update the immutable fields of an (in-memory) {@link EnteFile} with any edits
