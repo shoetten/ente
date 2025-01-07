@@ -16,18 +16,28 @@ const (
 	WebAppFirstUploadTemplate           = "web_app_first_upload.html"
 	MobileAppFirstUploadTemplate        = "mobile_app_first_upload.html"
 	FirstUploadEmailSubject             = "Congratulations! 🎉"
-	StorageLimitExceededMailLock        = "storage_limit_exceeded_mail_lock"
+	
+  StorageLimitExceededMailLock        = "storage_limit_exceeded_mail_lock"
 	StorageLimitExceededTemplateID      = "storage_limit_exceeded"
 	StorageLimitExceededTemplate        = "storage_limit_exceeded.html"
-	FilesCollectedTemplate              = "files_collected.html"
+	
+  FilesCollectedTemplate              = "files_collected.html"
 	FilesCollectedTemplateID            = "files_collected"
 	FilesCollectedSubject               = "You've got photos!"
+
 	SubscriptionUpgradedTemplate        = "subscription_upgraded.html"
 	SubscriptionUpgradedSubject         = "Thank you for choosing Ente!"
+  
+	SubscriptionCancelledSubject        = "Good bye (?) from Ente"
+	SubscriptionCancelledTemplate       = "subscription_cancelled.html"
 	FilesCollectedMuteDurationInMinutes = 10
-	StorageLimitExceededSubject         = "[Alert] You have exceeded your storage limit"
+
+  StorageLimitExceededSubject         = "[Alert] You have exceeded your storage limit"
 	ReferralSuccessfulTemplate          = "successful_referral.html"
 	ReferralSuccessfulSubject           = "You've earned 10 GB on Ente! 🎁"
+
+  LoginSuccessSubject                 = "New login to your Ente account"
+  LoginSuccessTemplate                = "on_login.html"
 )
 
 type EmailNotificationController struct {
@@ -110,6 +120,19 @@ func (c *EmailNotificationController) OnAccountUpgrade(userID int64) {
 	err = email.SendTemplatedEmail([]string{user.Email}, "team@ente.io", "team@ente.io", SubscriptionUpgradedSubject, SubscriptionUpgradedTemplate, nil, nil)
 	if err != nil {
 		log.Error("Error sending files collected email ", err)
+	}
+}
+
+func (c *EmailNotificationController) OnSubscriptionCancelled(userID int64) {
+	user, err := c.UserRepo.Get(userID)
+	if err != nil {
+		log.Error("Could not find user to email", err)
+		return
+	}
+	log.Info(fmt.Sprintf("Emailing on subscription cancellation %d", user.ID))
+	err = email.SendTemplatedEmail([]string{user.Email}, "vishnu@ente.io", "vishnu@ente.io", SubscriptionCancelledSubject, SubscriptionCancelledTemplate, nil, nil)
+	if err != nil {
+		log.Error("Error sending email", err)
 	}
 }
 

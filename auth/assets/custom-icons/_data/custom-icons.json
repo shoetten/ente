@@ -620,6 +620,10 @@
       "title": "NextDNS"
     },
     {
+      "title": "Newgrounds",
+      "slug": "newgrounds"
+    },
+    {
       "title": "Newton",
       "altNames": [
         "Newton Crypto"
@@ -719,6 +723,14 @@
     },
     {
       "title": "PostNL"
+    },
+    {
+      "title": "PostScan Mail",
+      "slug": "postscanmail",
+      "altNames": [
+        "Post Scan Mail",
+        "PostScanMail"
+      ]
     },
     {
       "title": "Privacy Guides",
