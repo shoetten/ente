@@ -381,7 +381,7 @@ function MemberSubscriptionManage({ open, userDetails, onClose }) {
                     />
                     <FlexWrapper px={2}>
                         <Button
-                            size="large"
+                            fullWidth
                             variant="outlined"
                             color="critical"
                             onClick={confirmLeaveFamily}
@@ -575,7 +575,7 @@ const UtilitySection: React.FC<UtilitySectionProps> = ({ closeSidebar }) => {
             <EnteMenuItem
                 variant="secondary"
                 onClick={redirectToChangeEmailPage}
-                label={t("CHANGE_EMAIL")}
+                label={t("change_email")}
             />
             <EnteMenuItem
                 variant="secondary"
