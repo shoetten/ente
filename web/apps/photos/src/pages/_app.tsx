@@ -1,14 +1,14 @@
 import { clientPackageName, isDesktop, staticAppTitle } from "@/base/app";
 import { CustomHead } from "@/base/components/Head";
+import { LoadingOverlay } from "@/base/components/LoadingOverlay";
 import { AttributedMiniDialog } from "@/base/components/MiniDialog";
-import { ActivityIndicator } from "@/base/components/mui/ActivityIndicator";
-import { Overlay } from "@/base/components/mui/Container";
 import { AppNavbar } from "@/base/components/Navbar";
 import {
     genericErrorDialogAttributes,
     useAttributedMiniDialog,
 } from "@/base/components/utils/dialog";
-import { setupI18n } from "@/base/i18n";
+import { useSetupI18n } from "@/base/components/utils/hooks-i18n";
+import { THEME_COLOR, getTheme } from "@/base/components/utils/theme";
 import log from "@/base/log";
 import {
     logStartupBanner,
@@ -33,8 +33,6 @@ import {
     getData,
     migrateKVToken,
 } from "@ente/shared/storage/localStorage";
-import { getTheme } from "@ente/shared/themes";
-import { THEME_COLOR } from "@ente/shared/themes/constants";
 import type { User } from "@ente/shared/user/types";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import { CssBaseline, styled } from "@mui/material";
@@ -48,12 +46,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import LoadingBar from "react-top-loading-bar";
 import { resumeExportsIfNeeded } from "services/export";
 import { photosLogout } from "services/logout";
-import "styles/global.css";
 import { NotificationAttributes } from "types/Notification";
+
+import "@fontsource-variable/inter"; /* Inter Variable, supports weights 100-900 */
+import "styles/global.css";
 
 export default function App({ Component, pageProps }: AppProps) {
     const router = useRouter();
-    const [isI18nReady, setIsI18nReady] = useState<boolean>(false);
     const [loading, setLoading] = useState(false);
     const [showNavbar, setShowNavBar] = useState(false);
     const [watchFolderView, setWatchFolderView] = useState(false);
@@ -64,6 +63,7 @@ export default function App({ Component, pageProps }: AppProps) {
         useState<NotificationAttributes>(null);
 
     const isOffline = useIsOffline();
+    const isI18nReady = useSetupI18n();
     const { showMiniDialog, miniDialogProps } = useAttributedMiniDialog();
     const { loadingBarRef, showLoadingBar, hideLoadingBar } = useLoadingBar();
     const [themeColor, setThemeColor] = useLocalState(
@@ -72,7 +72,6 @@ export default function App({ Component, pageProps }: AppProps) {
     );
 
     useEffect(() => {
-        void setupI18n().finally(() => setIsI18nReady(true));
         const user = getData(LS_KEYS.USER) as User | undefined | null;
         void migrateKVToken(user);
         logStartupBanner(user?.id);
@@ -132,7 +131,10 @@ export default function App({ Component, pageProps }: AppProps) {
         if (needsFamilyRedirect && getData(LS_KEYS.USER)?.token)
             redirectToFamilyPortal();
 
+        // TODO: Remove me after instrumenting for a bit.
+        let t = Date.now();
         router.events.on("routeChangeStart", (url: string) => {
+            t = Date.now();
             const newPathname = url.split("?")[0];
             if (window.location.pathname !== newPathname) {
                 setLoading(true);
@@ -148,6 +150,7 @@ export default function App({ Component, pageProps }: AppProps) {
         });
 
         router.events.on("routeChangeComplete", () => {
+            log.debug(() => `Route change took ${Date.now() - t} ms`);
             setLoading(false);
         });
     }, []);
@@ -224,22 +227,8 @@ export default function App({ Component, pageProps }: AppProps) {
                 />
 
                 <AppContext.Provider value={appContext}>
-                    {(loading || !isI18nReady) && (
-                        <Overlay
-                            sx={(theme) => ({
-                                display: "flex",
-                                justifyContent: "center",
-                                alignItems: "center",
-                                zIndex: 2000,
-                                backgroundColor: theme.colors.background.base,
-                            })}
-                        >
-                            <ActivityIndicator />
-                        </Overlay>
-                    )}
-                    {isI18nReady && (
-                        <Component setLoading={setLoading} {...pageProps} />
-                    )}
+                    {(loading || !isI18nReady) && <LoadingOverlay />}
+                    {isI18nReady && <Component {...pageProps} />}
                 </AppContext.Provider>
             </ThemeProvider>
         </>
