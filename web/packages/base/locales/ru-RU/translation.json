@@ -12,7 +12,7 @@
     "enter_email": "Введите ваш email адрес",
     "invalid_email_error": "Введите действительный email адрес",
     "required": "Обязательное поле",
-    "email_not_registered": "Email не зарегистрирован",
+    "email_not_registered": "Такой email не зарегистрирован",
     "email_already_registered": "Такой email уже зарегистрирован",
     "email_sent": "Проверочный код отправлен на <a>{{email}}</a>",
     "check_inbox_hint": "Пожалуйста, проверьте свои входящие (и спам) на указанном email адресе для завершения верификации",
