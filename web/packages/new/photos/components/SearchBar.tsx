@@ -324,13 +324,13 @@ const Control = ({ children, ...props }: ControlProps<SearchOption, false>) => (
             }}
         >
             <Box
-                sx={(theme) => ({
+                sx={{
                     display: "inline-flex",
                     // Match the default padding of the ValueContainer to make
                     // the icon look properly spaced and aligned.
                     pl: "8px",
-                    color: theme.colors.stroke.muted,
-                })}
+                    color: "stroke.muted",
+                }}
             >
                 {iconForOption(props.getValue()[0])}
             </Box>
@@ -379,8 +379,7 @@ const shouldShowEmptyState = (inputValue: string) => {
     if (!isMLSupported) return false;
 
     const status = mlStatusSnapshot();
-    if (!status || status.phase == "disabled" || status.phase == "done")
-        return false;
+    if (!status || status.phase == "disabled") return false;
 
     // Show it otherwise.
     return true;
@@ -396,13 +395,13 @@ const EmptyState: React.FC<
     const mlStatus = useMLStatusSnapshot();
     const people = usePeopleStateSnapshot()?.visiblePeople;
 
-    if (!mlStatus || mlStatus.phase == "disabled" || mlStatus.phase == "done") {
+    if (!mlStatus || mlStatus.phase == "disabled") {
         // The preflight check should've prevented us from coming here.
         assertionFailed();
         return <></>;
     }
 
-    let label: string;
+    let label: string | undefined;
     switch (mlStatus.phase) {
         case "scheduled":
             label = t("indexing_scheduled");
@@ -426,28 +425,23 @@ const EmptyState: React.FC<
                     <SearchPeopleList {...{ people, onSelectPerson }} />
                 </>
             )}
-            <Typography variant="mini" sx={{ mt: "5px", mb: "4px" }}>
-                {label}
-            </Typography>
+            {label && (
+                <Typography variant="mini" sx={{ mt: "5px", mb: "4px" }}>
+                    {label}
+                </Typography>
+            )}
         </Box>
     );
 };
 
 const SearchPeopleHeader: React.FC<ButtonishProps> = ({ onClick }) => (
-    <SearchPeopleHeaderButton {...{ onClick }}>
-        <Typography sx={{ color: "text.muted" }}>{t("people")}</Typography>
-    </SearchPeopleHeaderButton>
-);
-
-const SearchPeopleHeaderButton = styled(UnstyledButton)(
-    ({ theme }) => `
-    /* The color for the chevron */
-    color: ${theme.colors.stroke.muted};
-    /* Hover indication */
-    && :hover {
-        color: ${theme.colors.stroke.base};
-    }
-`,
+    <UnstyledButton {...{ onClick }}>
+        <Typography
+            sx={{ color: "text.muted", ":hover": { color: "text.base" } }}
+        >
+            {t("people")}
+        </Typography>
+    </UnstyledButton>
 );
 
 const Option: React.FC<OptionProps<SearchOption, false>> = (props) => (
